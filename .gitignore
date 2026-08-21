@@ -1,4 +1,6 @@
 _seed_progress.js
+_lock.js
+_verify_lock.js
 progress-seed.json
 .DS_Store
 Thumbs.db
