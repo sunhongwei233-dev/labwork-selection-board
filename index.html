@@ -437,21 +437,25 @@ function startBoard() {
     return null;
   }
   var OPENER = "http://127.0.0.1:8766/open-pair";
+  function openTab(url) {
+    if (!url) return null;
+    var a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    return true;
+  }
   function openPair(ebay, ali) {
-    var q = OPENER + "?ebay=" + encodeURIComponent(ebay) +
-      "&ali=" + encodeURIComponent(ali || "") + "&t=" + Date.now();
-    var img = new Image();
-    var fallback = setTimeout(function () {
-      window.open(ebay, "_blank");
-      if (ali) window.open(ali, "_blank");
-    }, 800);
-    img.onload = function () { clearTimeout(fallback); };
-    img.onerror = function () {
-      clearTimeout(fallback);
-      window.open(ebay, "_blank");
-      if (ali) window.open(ali, "_blank");
-    };
-    img.src = q;
+    try {
+      var img = new Image();
+      img.src = OPENER + "?ebay=" + encodeURIComponent(ebay) +
+        "&ali=" + encodeURIComponent(ali || "") + "&t=" + Date.now();
+    } catch (e) {}
+    if (ali) openTab(ali);
+    openTab(ebay);
   }
   document.getElementById("tbody").addEventListener("click", function (ev) {
     var tr = ev.target.closest("tr");
@@ -485,7 +489,17 @@ function startBoard() {
     if (ev.target.classList.contains("open-both")) {
       var ebay = it.ebay_url || ("https://www.ebay.com/itm/" + it.item_id);
       var ali = it.cogs_offer_url || "";
-      openPair(ebay, ali);
+      var aAli = tr.querySelector("a.lnk-1688");
+      var aEbay = tr.querySelector("a.lnk-ebay");
+      if (aAli) aAli.click();
+      else if (ali) openTab(ali);
+      if (aEbay) aEbay.click();
+      else openTab(ebay);
+      try {
+        var img = new Image();
+        img.src = OPENER + "?ebay=" + encodeURIComponent(ebay) +
+          "&ali=" + encodeURIComponent(ali || "") + "&t=" + Date.now();
+      } catch (e) {}
       return;
     }
     if (ev.target.closest("a.lnk-ebay") || ev.target.closest("a.lnk-1688")) {
