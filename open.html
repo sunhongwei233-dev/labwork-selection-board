@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>优秀选品工作名单</title>
+<style>
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:#f7f1e6;color:#6b6258;font:14px/1.5 "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+#msg{text-align:center;padding:24px}
+button{margin-top:12px;padding:8px 14px;border:1px solid #1a1714;background:#1a1714;color:#fffdf8;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="msg">正在打开优秀选品工作名单…</div>
+<script>
+(function () {
+  var SRC = "https://gist.githubusercontent.com/sunhongwei233-dev/b7987a17c5e84227d8d5203d93188a7d/raw/index.html";
+  function show(err) {
+    document.getElementById("msg").innerHTML =
+      "打开失败，请刷新重试。" + (err ? "<br>" + err : "") +
+      "<br><button type=\"button\" id=\"retry\">重新加载</button>";
+    var btn = document.getElementById("retry");
+    if (btn) btn.onclick = load;
+  }
+  function load() {
+    document.getElementById("msg").textContent = "正在打开优秀选品工作名单…";
+    fetch(SRC + "?t=" + Date.now(), { cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.text();
+    }).then(function (html) {
+      if (!html || html.indexOf("<html") === -1) throw new Error("内容无效");
+      document.open("text/html", "replace");
+      document.write(html);
+      document.close();
+    }).catch(function (e) {
+      show(e && e.message);
+    });
+  }
+  load();
+})();
+</script>
+</body>
+</html>
