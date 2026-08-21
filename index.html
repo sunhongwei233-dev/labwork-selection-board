@@ -33,9 +33,15 @@ th,td{border:1px solid var(--line);padding:6px 7px;vertical-align:top;text-align
 th.seq,td.seq{width:44px;text-align:right;color:var(--muted);white-space:nowrap}
 td.title{max-width:280px}
 input.edit{width:84px;padding:4px 6px;border:1px solid #c4b49a;background:#fff}
+input.note-in{width:168px;min-width:120px;padding:4px 6px;border:1px solid #c4b49a;background:#fff}
+td.acts{width:88px;white-space:nowrap}
+td.acts button{display:block;width:100%;margin:2px 0;padding:4px 8px}
+button.seen{color:#57534e}
 tr.picked{background:#ecfdf5}
 tr.excluded,tr.excluded.picked{background:#fecaca}
 tr.excluded td{color:#7f1d1d}
+tr.seen td{background:#e7e5e4 !important;color:#78716c !important}
+tr.seen a,tr.seen .v-优秀,tr.seen .v-可做,tr.seen .v-偏紧,tr.seen .v-不建议{color:#78716c !important}
 button.drop{color:#9f1239}
 .v-优秀{color:var(--ok);font-weight:700}
 .v-可做{color:#166534;font-weight:700}
@@ -98,7 +104,7 @@ body.unlocked .foot{display:flex}
   <table>
     <thead>
       <tr>
-        <th class="seq">序号</th><th></th><th></th><th>判定</th><th>毛利$</th><th>毛利%</th><th>标题</th><th>ID / OE</th>
+        <th class="seq">序号</th><th>操作</th><th>判定</th><th>毛利$</th><th>毛利%</th><th>标题</th><th>备注</th><th>ID / OE</th>
         <th>同款</th><th>同款Sold</th><th>eBay$</th><th>1688¥</th><th></th>
         <th>头程</th><th>尾程</th><th>店铺</th><th>链接</th><th>打开</th>
       </tr>
@@ -135,6 +141,8 @@ function startBoard() {
   var tab = "all";
   var selected = {};
   var excluded = {};
+  var seen = {};
+  var notes = {};
   var FX = DATA.fx || 7.2;
   var cloudTimer = null;
   var pushing = false;
@@ -168,14 +176,26 @@ function startBoard() {
         edits[it.item_id] = { price_usd: it.price_usd, cogs_cny: it.cogs_cny };
       }
     });
-    return { v: 1, list_id: LIST_ID, selected: Object.keys(selected), excluded: Object.keys(excluded), edits: edits, saved_at: new Date().toISOString() };
+    var noteMap = {};
+    Object.keys(notes).forEach(function (id) {
+      var t = String(notes[id] || "").trim();
+      if (t) noteMap[id] = t;
+    });
+    return { v: 2, list_id: LIST_ID, selected: Object.keys(selected), excluded: Object.keys(excluded), seen: Object.keys(seen), notes: noteMap, edits: edits, saved_at: new Date().toISOString() };
   }
   function applyState(st, persistLocal) {
     if (!st) return;
     selected = {};
     excluded = {};
+    seen = {};
+    notes = {};
     (st.selected || []).forEach(function (id) { selected[id] = true; });
     (st.excluded || []).forEach(function (id) { excluded[id] = true; });
+    (st.seen || []).forEach(function (id) { seen[id] = true; });
+    Object.keys(st.notes || {}).forEach(function (id) {
+      var t = String(st.notes[id] || "").trim();
+      if (t) notes[id] = t;
+    });
     ITEMS.forEach(function (it) {
       it.price_usd = Number(it.price_usd0);
       it.cogs_cny = Number(it.cogs_cny0);
@@ -205,7 +225,7 @@ function startBoard() {
     syncLabel = msg;
     var el = document.getElementById("foot-left");
     if (!el) return;
-    el.textContent = "已选中 " + Object.keys(selected).length + " 条 · 已排除 " + Object.keys(excluded).length + " 条 · " + msg;
+    el.textContent = "已选中 " + Object.keys(selected).length + " 条 · 已排除 " + Object.keys(excluded).length + " 条 · 已阅 " + Object.keys(seen).length + " 条 · " + msg;
   }
   function pushCloud(st) {
     pushing = true;
@@ -233,6 +253,8 @@ function startBoard() {
   }
   function pullCloud(forceRender) {
     if (pushing || skipPoll > 0) { skipPoll--; return Promise.resolve(); }
+    var ae = document.activeElement;
+    if (ae && (ae.classList.contains("note-in") || ae.classList.contains("edit"))) return Promise.resolve();
     return fetch(CLOUD.url, {
       method: "GET",
       cache: "no-store",
@@ -245,7 +267,7 @@ function startBoard() {
       return r.json();
     }).then(function (st) {
       if (!st || typeof st !== "object") return;
-      var remoteCount = (st.selected || []).length + (st.excluded || []).length + Object.keys(st.edits || {}).length;
+      var remoteCount = (st.selected || []).length + (st.excluded || []).length + (st.seen || []).length + Object.keys(st.edits || {}).length + Object.keys(st.notes || {}).length;
       if (!st.saved_at && remoteCount === 0) return;
       if (st.saved_at && st.saved_at === lastRemoteAt) return;
       if (lastLocalAt && st.saved_at && st.saved_at < lastLocalAt) return;
@@ -280,7 +302,7 @@ function startBoard() {
       if (fv && it.verdict !== fv) return false;
       if (fs && it.store_name !== fs) return false;
       if (!q) return true;
-      var blob = [it.title, it.title_zh, it.item_id, it.oe_display, it.store_name, it.vehicle_label].join(" ").toLowerCase();
+      var blob = [it.title, it.title_zh, it.item_id, it.oe_display, it.store_name, it.vehicle_label, notes[it.item_id] || ""].join(" ").toLowerCase();
       return blob.indexOf(q) >= 0;
     });
   }
@@ -291,16 +313,21 @@ function startBoard() {
     tb.innerHTML = rows.map(function (it, i) {
       var on = !!selected[it.item_id];
       var drop = !!excluded[it.item_id];
-      var rowCls = (drop ? "excluded" : "") + (on && !drop ? " picked" : "");
+      var read = !!seen[it.item_id];
+      var rowCls = (drop ? "excluded " : "") + (on && !drop ? "picked " : "") + (read ? "seen" : "");
       return "<tr class=\"" + rowCls.trim() + "\" data-id=\"" + esc(it.item_id) + "\">" +
         "<td class=\"seq\">" + (i + 1) + "</td>" +
-        "<td><button type=\"button\" class=\"sel\">" + (on ? "取消选中" : "选中") + "</button></td>" +
-        "<td><button type=\"button\" class=\"drop\">" + (drop ? "取消排除" : "排除") + "</button></td>" +
+        "<td class=\"acts\">" +
+          "<button type=\"button\" class=\"sel\">" + (on ? "取消选中" : "选中") + "</button>" +
+          "<button type=\"button\" class=\"drop\">" + (drop ? "取消排除" : "排除") + "</button>" +
+          "<button type=\"button\" class=\"seen\">" + (read ? "取消已阅" : "已阅") + "</button>" +
+        "</td>" +
         "<td class=\"v-" + esc(it.verdict) + "\">" + esc(it.verdict) + "</td>" +
         "<td>" + money(it.profit_wh_usd, "$") + "</td>" +
         "<td>" + (it.margin_wh_pct == null ? "" : it.margin_wh_pct + "%") + "</td>" +
         "<td class=\"title\"><b>" + esc(it.title_zh || it.title) + "</b><div>" + esc((it.title || "").slice(0, 90)) + "</div>" +
           (it.vehicle_label ? "<div>" + esc(it.vehicle_label) + "</div>" : "") + "</td>" +
+        "<td class=\"note\"><input class=\"note-in\" type=\"text\" maxlength=\"200\" placeholder=\"备注\" value=\"" + esc(notes[it.item_id] || "") + "\"/></td>" +
         "<td><a href=\"" + esc(it.ebay_url || ("https://www.ebay.com/itm/" + it.item_id)) + "\" target=\"_blank\">" + esc(it.item_id) + "</a><div>" + esc(it.oe_display) + "</div></td>" +
         "<td>" + esc(it.same_listing_count) + "</td>" +
         "<td>" + esc(it.same_listing_sold_sum) + "</td>" +
@@ -319,6 +346,7 @@ function startBoard() {
     }).join("");
     var nSel = Object.keys(selected).length;
     var nDrop = Object.keys(excluded).length;
+    var nSeen = Object.keys(seen).length;
     document.getElementById("tab-sel").textContent = "已选中 (" + nSel + ")";
     document.getElementById("count").textContent = "显示 " + rows.length + " / " + ITEMS.length;
     var excel = ITEMS.filter(function (it) { return it.verdict === "优秀"; }).length;
@@ -335,10 +363,11 @@ function startBoard() {
       "<span>候选<b>" + ITEMS.length + "</b></span>" +
       "<span>已选中<b>" + nSel + "</b></span>" +
       "<span>已排除<b>" + nDrop + "</b></span>" +
+      "<span>已阅<b>" + nSeen + "</b></span>" +
       "<span>当前仍优秀<b>" + excel + "</b></span>" +
       "<span>已改价<b>" + ITEMS.filter(function (it) { return Number(it.price_usd) !== Number(it.price_usd0) || Number(it.cogs_cny) !== Number(it.cogs_cny0); }).length + "</b></span>" +
       storeBits;
-    document.getElementById("foot-left").textContent = "已选中 " + nSel + " 条 · 已排除 " + nDrop + " 条 · " + syncLabel;
+    document.getElementById("foot-left").textContent = "已选中 " + nSel + " 条 · 已排除 " + nDrop + " 条 · 已阅 " + nSeen + " 条 · " + syncLabel;
   }
   function byId(id) {
     for (var i = 0; i < ITEMS.length; i++) if (ITEMS[i].item_id === id) return ITEMS[i];
@@ -380,6 +409,13 @@ function startBoard() {
       render();
       return;
     }
+    if (ev.target.classList.contains("seen")) {
+      if (seen[it.item_id]) delete seen[it.item_id];
+      else seen[it.item_id] = true;
+      saveState();
+      render();
+      return;
+    }
     if (ev.target.classList.contains("open-both")) {
       var ebay = it.ebay_url || ("https://www.ebay.com/itm/" + it.item_id);
       var ali = it.cogs_offer_url || "";
@@ -402,6 +438,16 @@ function startBoard() {
   });
   document.getElementById("tbody").addEventListener("input", function (ev) {
     if (ev.target.classList.contains("edit")) ev.target.classList.add("dirty");
+    if (ev.target.classList.contains("note-in")) {
+      var tr = ev.target.closest("tr");
+      if (!tr) return;
+      var it = byId(tr.getAttribute("data-id"));
+      if (!it) return;
+      var val = ev.target.value;
+      if (String(val).trim()) notes[it.item_id] = val;
+      else delete notes[it.item_id];
+      saveState();
+    }
   });
   document.querySelectorAll(".tabs button").forEach(function (btn) {
     btn.addEventListener("click", function () {
@@ -442,6 +488,8 @@ function startBoard() {
         localStorage.setItem(KEY, JSON.stringify(st));
         selected = {};
         excluded = {};
+        seen = {};
+        notes = {};
         loadState();
         saveState();
         render();
