@@ -33,7 +33,9 @@ th,td{border:1px solid var(--line);padding:6px 7px;vertical-align:top;text-align
 th.seq,td.seq{width:44px;text-align:right;color:var(--muted);white-space:nowrap}
 td.title{max-width:280px}
 input.edit{width:84px;padding:4px 6px;border:1px solid #c4b49a;background:#fff}
-input.note-in{width:168px;min-width:120px;padding:4px 6px;border:1px solid #c4b49a;background:#fff}
+input.note-in{width:200px;min-width:140px;padding:6px 8px;border:1px solid #c4b49a;background:#fff}
+td.note{min-width:160px;background:#fffbeb}
+.note-preview{margin-top:4px;color:#b45309;font-size:12px}
 td.acts{width:88px;white-space:nowrap}
 td.acts button{display:block;width:100%;margin:2px 0;padding:4px 8px}
 button.seen{color:#57534e}
@@ -104,7 +106,7 @@ body.unlocked .foot{display:flex}
   <table>
     <thead>
       <tr>
-        <th class="seq">序号</th><th>操作</th><th>判定</th><th>毛利$</th><th>毛利%</th><th>标题</th><th>备注</th><th>ID / OE</th>
+        <th class="seq">序号</th><th>操作</th><th>备注</th><th>判定</th><th>毛利$</th><th>毛利%</th><th>标题</th><th>ID / OE</th>
         <th>同款</th><th>同款Sold</th><th>eBay$</th><th>1688¥</th><th></th>
         <th>头程</th><th>尾程</th><th>店铺</th><th>链接</th><th>打开</th>
       </tr>
@@ -197,6 +199,9 @@ function startBoard() {
       if (t) notes[id] = t;
     });
     ITEMS.forEach(function (it) {
+      it.note = notes[it.item_id] || "";
+    });
+    ITEMS.forEach(function (it) {
       it.price_usd = Number(it.price_usd0);
       it.cogs_cny = Number(it.cogs_cny0);
     });
@@ -285,7 +290,21 @@ function startBoard() {
     return st;
   }
   function esc(s) {
-    return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+  function setNote(id, val) {
+    var t = String(val == null ? "" : val).trim();
+    if (t) notes[id] = t;
+    else delete notes[id];
+    var it = byId(id);
+    if (it) it.note = t;
+  }
+  function flushOpenNotes() {
+    document.querySelectorAll("#tbody input.note-in").forEach(function (inp) {
+      var tr = inp.closest("tr");
+      if (!tr) return;
+      setNote(tr.getAttribute("data-id"), inp.value);
+    });
   }
   function money(n, u) {
     if (n == null || n === "") return "";
@@ -322,12 +341,13 @@ function startBoard() {
           "<button type=\"button\" class=\"drop\">" + (drop ? "取消排除" : "排除") + "</button>" +
           "<button type=\"button\" class=\"seen\">" + (read ? "取消已阅" : "已阅") + "</button>" +
         "</td>" +
+        "<td class=\"note\"><input class=\"note-in\" type=\"text\" maxlength=\"200\" placeholder=\"备注\" value=\"" + esc(notes[it.item_id] || it.note || "") + "\"/></td>" +
         "<td class=\"v-" + esc(it.verdict) + "\">" + esc(it.verdict) + "</td>" +
         "<td>" + money(it.profit_wh_usd, "$") + "</td>" +
         "<td>" + (it.margin_wh_pct == null ? "" : it.margin_wh_pct + "%") + "</td>" +
         "<td class=\"title\"><b>" + esc(it.title_zh || it.title) + "</b><div>" + esc((it.title || "").slice(0, 90)) + "</div>" +
-          (it.vehicle_label ? "<div>" + esc(it.vehicle_label) + "</div>" : "") + "</td>" +
-        "<td class=\"note\"><input class=\"note-in\" type=\"text\" maxlength=\"200\" placeholder=\"备注\" value=\"" + esc(notes[it.item_id] || "") + "\"/></td>" +
+          (it.vehicle_label ? "<div>" + esc(it.vehicle_label) + "</div>" : "") +
+          ((notes[it.item_id] || it.note) ? "<div class=\"note-preview\">备注：" + esc(notes[it.item_id] || it.note) + "</div>" : "") + "</td>" +
         "<td><a href=\"" + esc(it.ebay_url || ("https://www.ebay.com/itm/" + it.item_id)) + "\" target=\"_blank\">" + esc(it.item_id) + "</a><div>" + esc(it.oe_display) + "</div></td>" +
         "<td>" + esc(it.same_listing_count) + "</td>" +
         "<td>" + esc(it.same_listing_sold_sum) + "</td>" +
@@ -395,6 +415,9 @@ function startBoard() {
     if (!tr) return;
     var it = byId(tr.getAttribute("data-id"));
     if (!it) return;
+    if (ev.target.classList.contains("sel") || ev.target.classList.contains("drop") || ev.target.classList.contains("seen") || ev.target.classList.contains("ok")) {
+      flushOpenNotes();
+    }
     if (ev.target.classList.contains("sel")) {
       if (selected[it.item_id]) delete selected[it.item_id];
       else { selected[it.item_id] = true; delete excluded[it.item_id]; }
@@ -444,13 +467,27 @@ function startBoard() {
       var it = byId(tr.getAttribute("data-id"));
       if (!it) return;
       var val = ev.target.value;
-      if (String(val).trim()) notes[it.item_id] = val;
-      else delete notes[it.item_id];
+      setNote(it.item_id, val);
       saveState();
+      var preview = tr.querySelector(".note-preview");
+      var t = String(notes[it.item_id] || "").trim();
+      if (t) {
+        if (!preview) {
+          preview = document.createElement("div");
+          preview.className = "note-preview";
+          var titleCell = tr.querySelector("td.title");
+          if (titleCell) titleCell.appendChild(preview);
+        }
+        preview.textContent = "备注：" + t;
+      } else if (preview) {
+        preview.remove();
+      }
     }
   });
   document.querySelectorAll(".tabs button").forEach(function (btn) {
     btn.addEventListener("click", function () {
+      flushOpenNotes();
+      saveState();
       tab = btn.getAttribute("data-tab");
       document.querySelectorAll(".tabs button").forEach(function (b) { b.classList.toggle("on", b === btn); });
       render();
@@ -468,7 +505,11 @@ function startBoard() {
   });
   document.getElementById("btn-export").addEventListener("click", function () {
     var st = saveState();
-    st.items_selected = ITEMS.filter(function (it) { return selected[it.item_id]; });
+    st.items_selected = ITEMS.filter(function (it) { return selected[it.item_id]; }).map(function (it) {
+      var row = Object.assign({}, it);
+      row.note = notes[it.item_id] || "";
+      return row;
+    });
     var blob = new Blob([JSON.stringify(st, null, 2)], { type: "application/json" });
     var a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
