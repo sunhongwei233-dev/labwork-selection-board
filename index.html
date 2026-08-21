@@ -21,6 +21,10 @@ h1{margin:0;font-size:26px;letter-spacing:.02em}
 .kpis span{background:var(--card);border:1px solid var(--line);padding:8px 12px;min-width:88px}
 .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
 .bar input[type=search]{flex:1;min-width:220px;padding:8px 10px;border:1px solid var(--line);background:var(--card)}
+.bar input.range{width:88px;padding:8px 8px;border:1px solid var(--line);background:var(--card)}
+.bar .range-wrap{display:flex;align-items:center;gap:4px}
+th.sort{cursor:pointer;user-select:none;white-space:nowrap}
+th.sort:hover{background:var(--chip)}
 .bar button,.tab button,td button{
   border:1px solid var(--line);background:var(--card);padding:7px 12px;cursor:pointer}
 .bar button.pri{background:#1a1714;color:#fffdf8;border-color:#1a1714}
@@ -99,6 +103,18 @@ body.unlocked .foot{display:flex}
     <label>判定 <select id="f-verdict"><option value="">全部</option>
       <option>优秀</option><option>可做</option><option>偏紧</option><option>不建议</option></select></label>
     <label>店铺 <select id="f-store"><option value="">全部店铺</option><option value="labwork">labwork</option></select></label>
+    <label>毛利率
+      <select id="f-margin-sort">
+        <option value="">默认顺序</option>
+        <option value="desc">从高到低</option>
+        <option value="asc">从低到高</option>
+      </select>
+    </label>
+    <label class="range-wrap">1688价 ¥
+      <input id="f-cogs-min" class="range" type="number" min="0" step="1" placeholder="最低">
+      <span>—</span>
+      <input id="f-cogs-max" class="range" type="number" min="0" step="1" placeholder="最高">
+    </label>
     <button type="button" id="reset">重置筛选</button>
     <span id="count">显示 586 / 586</span>
   </div>
@@ -106,7 +122,7 @@ body.unlocked .foot{display:flex}
   <table>
     <thead>
       <tr>
-        <th class="seq">序号</th><th>操作</th><th>备注</th><th>判定</th><th>毛利$</th><th>毛利%</th><th>标题</th><th>ID / OE</th>
+        <th class="seq">序号</th><th>操作</th><th>备注</th><th>判定</th><th>毛利$</th><th id="th-margin" class="sort" title="点击切换毛利率排序">毛利%</th><th>标题</th><th>ID / OE</th>
         <th>同款</th><th>同款Sold</th><th>eBay$</th><th>1688¥</th><th></th>
         <th>头程</th><th>尾程</th><th>店铺</th><th>链接</th><th>打开</th>
       </tr>
@@ -316,17 +332,44 @@ function startBoard() {
     var q = (document.getElementById("q").value || "").trim().toLowerCase();
     var fv = document.getElementById("f-verdict").value;
     var fs = (document.getElementById("f-store") || {}).value || "";
-    return ITEMS.filter(function (it) {
+    var minEl = document.getElementById("f-cogs-min");
+    var maxEl = document.getElementById("f-cogs-max");
+    var cmin = minEl ? Number(minEl.value) : NaN;
+    var cmax = maxEl ? Number(maxEl.value) : NaN;
+    var hasMin = !!(minEl && minEl.value !== "" && !isNaN(cmin));
+    var hasMax = !!(maxEl && maxEl.value !== "" && !isNaN(cmax));
+    var rows = ITEMS.filter(function (it) {
       if (tab === "sel" && !selected[it.item_id]) return false;
       if (fv && it.verdict !== fv) return false;
       if (fs && it.store_name !== fs) return false;
+      var cogs = Number(it.cogs_cny);
+      if (hasMin && !(cogs >= cmin)) return false;
+      if (hasMax && !(cogs <= cmax)) return false;
       if (!q) return true;
       var blob = [it.title, it.title_zh, it.item_id, it.oe_display, it.store_name, it.vehicle_label, notes[it.item_id] || ""].join(" ").toLowerCase();
       return blob.indexOf(q) >= 0;
     });
+    var sort = (document.getElementById("f-margin-sort") || {}).value || "";
+    if (sort === "desc" || sort === "asc") {
+      rows = rows.slice().sort(function (a, b) {
+        var am = Number(a.margin_wh_pct);
+        var bm = Number(b.margin_wh_pct);
+        if (isNaN(am)) am = -1e9;
+        if (isNaN(bm)) bm = -1e9;
+        return sort === "desc" ? bm - am : am - bm;
+      });
+    }
+    return rows;
+  }
+  function updateSortHeader() {
+    var th = document.getElementById("th-margin");
+    if (!th) return;
+    var sort = (document.getElementById("f-margin-sort") || {}).value || "";
+    th.textContent = sort === "desc" ? "毛利% ↓" : sort === "asc" ? "毛利% ↑" : "毛利%";
   }
   function render() {
     var rows = filtered();
+    updateSortHeader();
     var tb = document.getElementById("tbody");
     document.getElementById("empty").hidden = rows.length > 0;
     tb.innerHTML = rows.map(function (it, i) {
@@ -497,10 +540,30 @@ function startBoard() {
   document.getElementById("f-verdict").addEventListener("change", render);
   var storeSel = document.getElementById("f-store");
   if (storeSel) storeSel.addEventListener("change", render);
+  var marginSort = document.getElementById("f-margin-sort");
+  if (marginSort) marginSort.addEventListener("change", render);
+  ["f-cogs-min", "f-cogs-max"].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener("input", render);
+  });
+  var thMargin = document.getElementById("th-margin");
+  if (thMargin) {
+    thMargin.addEventListener("click", function () {
+      var sel = document.getElementById("f-margin-sort");
+      if (!sel) return;
+      sel.value = sel.value === "desc" ? "asc" : sel.value === "asc" ? "" : "desc";
+      render();
+    });
+  }
   document.getElementById("reset").addEventListener("click", function () {
     document.getElementById("q").value = "";
     document.getElementById("f-verdict").value = "";
     if (storeSel) storeSel.value = "";
+    if (marginSort) marginSort.value = "";
+    var cmin = document.getElementById("f-cogs-min");
+    var cmax = document.getElementById("f-cogs-max");
+    if (cmin) cmin.value = "";
+    if (cmax) cmax.value = "";
     render();
   });
   document.getElementById("btn-export").addEventListener("click", function () {
