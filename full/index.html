@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>labwork 全店选品名单</title>
+<style>
+:root{--ink:#1a1714;--muted:#6b6258;--line:#e4d9c8;--paper:#f7f1e6;--card:#fffdf8;--ok:#0f766e;--warn:#b45309;--bad:#9f1239;--chip:#efe6d6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.45 "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+.wrap{max-width:1480px;margin:0 auto;padding:22px 18px 80px}
+h1{margin:0;font-size:24px}
+.sub{color:var(--muted);font-size:13px;margin-top:6px}
+.kpis{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+.kpis span{background:var(--card);border:1px solid var(--line);padding:8px 12px;min-width:84px}
+.kpis b{display:block;font-size:18px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px}
+.bar input,.bar select{padding:7px 8px;border:1px solid var(--line);background:var(--card)}
+.bar input[type=search]{flex:1;min-width:220px}
+.bar button{border:1px solid var(--line);background:var(--card);padding:7px 12px;cursor:pointer}
+.bar button:disabled{opacity:.4;cursor:default}
+.hint{font-size:12px;color:var(--muted);margin:0 0 10px}
+table{width:100%;border-collapse:collapse;background:var(--card);font-size:12px}
+th,td{border:1px solid var(--line);padding:6px 7px;vertical-align:top;text-align:left}
+th{position:sticky;top:0;background:var(--chip);z-index:1}
+td.title{max-width:280px}
+.v-优秀{color:var(--ok);font-weight:700}
+.v-可做{color:#166534;font-weight:700}
+.v-偏紧{color:var(--warn);font-weight:700}
+.v-不建议{color:var(--bad);font-weight:700}
+.v-缺采购价{color:#78716c}
+a{color:#1d4ed8;text-decoration:none}
+.foot{position:sticky;bottom:0;background:#1a1714;color:#fffdf8;padding:10px 16px}
+.empty{padding:28px;color:var(--muted)}
+.pager{display:flex;align-items:center;gap:6px}
+.wrap,.foot{display:none}
+body.unlocked .wrap{display:block}
+body.unlocked .foot{display:block}
+#gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+#gate form{background:var(--card);border:1px solid var(--line);padding:28px 24px;width:100%;max-width:360px}
+#gate h1{font-size:20px;margin:0 0 8px}
+#gate p{margin:0 0 16px;color:var(--muted);font-size:13px}
+#gate input{width:100%;padding:10px 12px;border:1px solid var(--line);background:#fff;margin:0 0 12px;font-size:16px}
+#gate button{width:100%;padding:10px 12px;border:1px solid #1a1714;background:#1a1714;color:#fffdf8;cursor:pointer}
+#gate-err{color:var(--bad);margin:12px 0 0}
+</style>
+</head>
+<body>
+<div id="gate">
+  <form id="gate-form" autocomplete="off">
+    <h1>labwork 全店选品名单</h1>
+    <p>请输入访问密码后进入</p>
+    <input id="gate-pass" type="password" autocomplete="current-password" autofocus>
+    <button type="submit">进入</button>
+    <p id="gate-err" hidden>密码不正确</p>
+  </form>
+</div>
+<script type="application/json" id="wb-enc">{"v":1,"kdf":"pbkdf2-sha256","iter":120000,"salt":"yAcAMi859CrG4tjZsMCJ6A==","iv":"He96R3cXb/ipEDqX","tag":"HfGID8yKTjuk9zUk/zm1BQ==","data":"W3ZFmTUFdTA="}</script>
+<div class="wrap">
+  <h1 id="page-title">labwork 全店选品名单</h1>
+  <div class="sub" id="meta">正在加载数据目录…</div>
+  <div class="kpis" id="kpis"></div>
+  <div class="bar">
+    <input type="search" id="q" placeholder="搜标题 / ID / OE / 上线时间"/>
+    <select id="f-verdict"><option value="">全部判定</option></select>
+    <select id="f-sort">
+      <option value="profit">毛利从高到低</option>
+      <option value="margin">毛利率从高到低</option>
+      <option value="listed">上线时间从新到旧</option>
+    </select>
+    <span class="pager">
+      <button type="button" id="pg-prev">上一页</button>
+      <span id="pg-info">1 / 1</span>
+      <button type="button" id="pg-next">下一页</button>
+      <select id="pg-size">
+        <option value="50">50条/页</option>
+        <option value="80" selected>80条/页</option>
+        <option value="150">150条/页</option>
+      </select>
+    </span>
+  </div>
+  <p class="hint">数据按页加载（默认 80 条），打开不会一次渲染全表。默认按毛利$从高到低。汇率 6.8。头程默认 $2.86、尾程默认 $4.8。</p>
+  <div id="empty" class="empty" hidden>没有匹配的商品</div>
+  <table>
+    <thead>
+      <tr>
+        <th>序号</th><th>判定</th><th>毛利$</th><th>毛利%</th><th>标题</th>
+        <th>ID / OE</th><th>链接上线时间</th><th>同款</th><th>同款Sold</th>
+        <th>eBay$</th><th>1688¥</th><th>头程</th><th>尾程</th>
+        <th>累计Sold</th><th>店铺</th><th>打开</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+<div class="foot" id="foot">准备加载</div>
+<script>
+(function () {
+  var DATA_BASE = new URL("data/", location.href).href;
+  var PAGE = 80;
+  var pageIdx = 0;
+  var searchTimer = null;
+  var manifest = null;
+  var indexRows = [];
+  var filtered = [];
+  var chunkCache = {};
+  var itemCache = {};
+  var sessionKey = null;
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+  function money(n, u) {
+    if (n == null || n === "") return "";
+    var x = Number(n);
+    if (isNaN(x)) return "";
+    return (Math.round(x * 100) / 100) + u;
+  }
+  function isEncFile(obj) {
+    return !!(obj && obj.iv && obj.tag && obj.data && obj.items == null && obj.rows == null && obj.chunks == null);
+  }
+  function decryptEnc(meta) {
+    if (!sessionKey) return Promise.reject(new Error("未解锁"));
+    var iv = b64ToBytes(meta.iv);
+    var tag = b64ToBytes(meta.tag);
+    var data = b64ToBytes(meta.data);
+    var packed = new Uint8Array(data.length + tag.length);
+    packed.set(data, 0);
+    packed.set(tag, data.length);
+    return crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, sessionKey, packed).then(function (buf) {
+      return JSON.parse(new TextDecoder().decode(buf));
+    });
+  }
+  function fetchJson(name) {
+    return fetch(DATA_BASE + name, { cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error(name + " HTTP " + r.status);
+      return r.json();
+    }).then(function (obj) {
+      if (isEncFile(obj)) return decryptEnc(obj);
+      return obj;
+    });
+  }
+  function applyFilter() {
+    var q = ($("q").value || "").trim().toLowerCase();
+    var fv = $("f-verdict").value;
+    var sort = $("f-sort").value;
+    filtered = indexRows.filter(function (r) {
+      if (fv && r[1] !== fv) return false;
+      if (!q) return true;
+      return (r[0] + " " + r[1] + " " + r[4] + " " + r[5]).toLowerCase().indexOf(q) >= 0;
+    });
+    filtered.sort(function (a, b) {
+      if (sort === "margin") return (Number(b[2]) || -1e9) - (Number(a[2]) || -1e9);
+      if (sort === "listed") return String(b[5] || "").localeCompare(String(a[5] || ""));
+      return (Number(b[3]) || -1e9) - (Number(a[3]) || -1e9);
+    });
+    var pages = Math.max(1, Math.ceil(filtered.length / PAGE));
+    if (pageIdx > pages - 1) pageIdx = pages - 1;
+    if (pageIdx < 0) pageIdx = 0;
+  }
+  function needChunks(rows) {
+    var set = {};
+    rows.forEach(function (r) { set[r[8]] = 1; });
+    return Object.keys(set).map(Number).filter(function (i) { return chunkCache[i] == null; });
+  }
+  function loadChunks(ids) {
+    return Promise.all(ids.map(function (i) {
+      var name = (manifest.chunks || [])[i];
+      if (!name) return Promise.resolve();
+      return fetchJson(name).then(function (data) {
+        chunkCache[i] = data.items || [];
+        (data.items || []).forEach(function (it) { itemCache[it.item_id] = it; });
+      });
+    }));
+  }
+  function render() {
+    applyFilter();
+    var start = pageIdx * PAGE;
+    var rows = filtered.slice(start, start + PAGE);
+    var missing = needChunks(rows);
+    var go = function () { paint(rows, start); };
+    if (missing.length) {
+      $("foot").textContent = "加载第 " + missing.join(",") + " 批数据…";
+      loadChunks(missing).then(go).catch(function (err) {
+        $("foot").textContent = "数据加载失败: " + err.message;
+      });
+    } else go();
+  }
+  function paint(rows, start) {
+    var pages = Math.max(1, Math.ceil(filtered.length / PAGE));
+    $("pg-info").textContent = (pageIdx + 1) + " / " + pages;
+    $("pg-prev").disabled = pageIdx <= 0;
+    $("pg-next").disabled = pageIdx >= pages - 1;
+    $("empty").hidden = filtered.length > 0;
+    $("tbody").innerHTML = rows.map(function (r, i) {
+      var it = itemCache[r[0]] || {};
+      var verdict = it.verdict || r[1] || "";
+      var ebay = it.ebay_url || ("https://www.ebay.com/itm/" + r[0]);
+      var ali = it.cogs_offer_url || "";
+      return "<tr>" +
+        "<td>" + (start + i + 1) + "</td>" +
+        "<td class=\"v-" + esc(verdict) + "\">" + esc(verdict) + "</td>" +
+        "<td>" + money(it.profit_wh_usd != null ? it.profit_wh_usd : r[3], "$") + "</td>" +
+        "<td>" + (it.margin_wh_pct != null ? it.margin_wh_pct + "%" : (r[2] != null ? r[2] + "%" : "")) + "</td>" +
+        "<td class=\"title\"><b>" + esc(it.title_zh || r[4] || it.title || "") + "</b><div>" + esc((it.title || "").slice(0, 90)) + "</div></td>" +
+        "<td><a href=\"" + esc(ebay) + "\" target=\"_blank\" rel=\"noopener\">" + esc(r[0]) + "</a><div>" + esc(it.oe_display || "") + "</div></td>" +
+        "<td>" + esc(it.listed_since || r[5] || "") + "</td>" +
+        "<td>" + esc(it.same_listing_count || "") + "</td>" +
+        "<td>" + esc(it.same_listing_sold_sum || "") + "</td>" +
+        "<td>" + money(it.price_usd != null ? it.price_usd : r[7], "$") + "</td>" +
+        "<td>" + money(it.cogs_cny != null ? it.cogs_cny : r[6], "¥") + "</td>" +
+        "<td>" + money(it.wh_first_leg_usd != null ? it.wh_first_leg_usd : 2.86, "$") + "</td>" +
+        "<td>" + money(it.wh_last_mile_usd != null ? it.wh_last_mile_usd : 4.8, "$") + "</td>" +
+        "<td>" + esc(it.sold_count_total || "") + "</td>" +
+        "<td>" + esc(it.store_name || "") + "</td>" +
+        "<td><a href=\"" + esc(ebay) + "\" target=\"_blank\" rel=\"noopener\">eBay</a>" +
+          (ali ? " · <a href=\"" + esc(ali) + "\" target=\"_blank\" rel=\"noopener\">1688</a>" : "") +
+        "</td></tr>";
+    }).join("");
+    $("foot").textContent = "显示 " + filtered.length + " / " + indexRows.length + " · 本页 " + rows.length + " 条 · 已缓存 " + Object.keys(chunkCache).length + " 批";
+  }
+  function rerenderTop() { pageIdx = 0; render(); }
+
+  function startBoard() {
+    Promise.all([fetchJson("manifest.json"), fetchJson("index.json")]).then(function (pair) {
+      manifest = pair[0];
+      indexRows = (pair[1].rows || []);
+      $("page-title").textContent = manifest.title || "选品名单";
+      document.title = manifest.title || document.title;
+      $("meta").textContent = "共 " + manifest.count + " 条 · 每批 " + manifest.chunk_size + " · 汇率 " + (manifest.fx || 6.8) + " · 默认按毛利从高到低";
+      var vsel = $("f-verdict");
+      Object.keys(manifest.verdicts || {}).sort().forEach(function (v) {
+        var o = document.createElement("option");
+        o.value = v; o.textContent = v + " (" + manifest.verdicts[v] + ")";
+        vsel.appendChild(o);
+      });
+      var bits = "<span>候选<b>" + manifest.count + "</b></span>";
+      Object.keys(manifest.verdicts || {}).forEach(function (v) {
+        bits += "<span>" + v + "<b>" + manifest.verdicts[v] + "</b></span>";
+      });
+      $("kpis").innerHTML = bits;
+      render();
+    }).catch(function (err) {
+      $("meta").textContent = "打不开 data/ 目录。请用 GitHub Pages 或本地静态服务打开，不要直接双击 HTML。";
+      $("foot").textContent = String(err.message || err);
+    });
+
+    $("q").addEventListener("input", function () {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(rerenderTop, 180);
+    });
+    $("f-verdict").addEventListener("change", rerenderTop);
+    $("f-sort").addEventListener("change", rerenderTop);
+    $("pg-prev").addEventListener("click", function () { if (pageIdx > 0) { pageIdx--; render(); } });
+    $("pg-next").addEventListener("click", function () { pageIdx++; render(); });
+    $("pg-size").addEventListener("change", function () {
+      PAGE = Number($("pg-size").value) || 80;
+      rerenderTop();
+    });
+  }
+
+  function b64ToBytes(s) {
+    var bin = atob(s);
+    var out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function deriveKey(password, salt, iter) {
+    return crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]).then(function (km) {
+      return crypto.subtle.deriveKey(
+        { name: "PBKDF2", salt: salt, iterations: iter, hash: "SHA-256" },
+        km,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["decrypt"]
+      );
+    });
+  }
+  function unlockWith(password) {
+    var raw = document.getElementById("wb-enc");
+    if (!raw) return Promise.resolve(true);
+    var meta;
+    try { meta = JSON.parse(raw.textContent || "{}"); } catch (e) { return Promise.resolve(false); }
+    if (!meta || !meta.data) return Promise.resolve(true);
+    var salt = b64ToBytes(meta.salt);
+    var iv = b64ToBytes(meta.iv);
+    var tag = b64ToBytes(meta.tag);
+    var data = b64ToBytes(meta.data);
+    var packed = new Uint8Array(data.length + tag.length);
+    packed.set(data, 0);
+    packed.set(tag, data.length);
+    return deriveKey(password, salt, meta.iter || 120000).then(function (key) {
+      sessionKey = key;
+      return crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, packed);
+    }).then(function (buf) {
+      var text = new TextDecoder().decode(buf);
+      var obj = JSON.parse(text);
+      return !!(obj && obj.ok);
+    }).catch(function () { sessionKey = null; return false; });
+  }
+  function bootGate() {
+    var form = document.getElementById("gate-form");
+    if (!form) { startBoard(); return; }
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var err = $("gate-err");
+      if (err) err.hidden = true;
+      unlockWith(($("gate-pass").value || "")).then(function (ok) {
+        if (!ok) { if (err) err.hidden = false; return; }
+        document.body.classList.add("unlocked");
+        var gate = document.getElementById("gate");
+        if (gate) gate.remove();
+        startBoard();
+      });
+    });
+  }
+  bootGate();
+})();
+</script>
+</body>
+</html>
