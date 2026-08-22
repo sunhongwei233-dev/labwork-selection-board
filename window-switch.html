@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>玻璃升降开关选品工作名单</title>
+<style>
+:root{
+  --ink:#1a1714; --muted:#6b6258; --line:#e4d9c8; --paper:#f7f1e6;
+  --card:#fffdf8; --ok:#0f766e; --warn:#b45309; --bad:#9f1239;
+  --sel:#115e59; --chip:#efe6d6;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:14px/1.45 "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+.wrap{max-width:1480px;margin:0 auto;padding:22px 18px 80px}
+.top{display:flex;justify-content:space-between;gap:16px;align-items:flex-end;flex-wrap:wrap}
+h1{margin:0;font-size:26px;letter-spacing:.02em}
+.sub{color:var(--muted);font-size:13px;margin-top:6px}
+.kpis{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}
+.kpis b{display:block;font-size:20px}
+.kpis span{background:var(--card);border:1px solid var(--line);padding:8px 12px;min-width:88px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+.bar input[type=search]{flex:1;min-width:220px;padding:8px 10px;border:1px solid var(--line);background:var(--card)}
+.bar input.range{width:88px;padding:8px 8px;border:1px solid var(--line);background:var(--card)}
+.bar .range-wrap{display:flex;align-items:center;gap:4px}
+th.sort{cursor:pointer;user-select:none;white-space:nowrap}
+th.sort:hover{background:var(--chip)}
+.bar button,.tab button,td button{
+  border:1px solid var(--line);background:var(--card);padding:7px 12px;cursor:pointer}
+.bar button.pri{background:#1a1714;color:#fffdf8;border-color:#1a1714}
+.tabs{display:flex;gap:0;margin:8px 0 0}
+.tabs button{border-bottom:none;border-radius:6px 6px 0 0}
+.tabs button.on{background:#1a1714;color:#fffdf8}
+.hint{font-size:12px;color:var(--muted);margin:8px 0 12px}
+table{width:100%;border-collapse:collapse;background:var(--card);font-size:12px}
+th,td{border:1px solid var(--line);padding:6px 7px;vertical-align:top;text-align:left}
+th.seq,td.seq{width:44px;text-align:right;color:var(--muted);white-space:nowrap}
+td.title{max-width:280px}
+input.edit{width:84px;padding:4px 6px;border:1px solid #c4b49a;background:#fff}
+input.note-in{width:200px;min-width:140px;padding:6px 8px;border:1px solid #c4b49a;background:#fff}
+td.note{min-width:160px;background:#fffbeb}
+.note-preview{margin-top:4px;color:#b45309;font-size:12px}
+td.acts{width:88px;white-space:nowrap}
+td.acts button{display:block;width:100%;margin:2px 0;padding:4px 8px}
+button.seen{color:#57534e}
+tr.picked{background:#ecfdf5}
+tr.excluded,tr.excluded.picked{background:#fecaca}
+tr.excluded td{color:#7f1d1d}
+tr.seen td{background:#e7e5e4 !important;color:#78716c !important}
+tr.seen a,tr.seen .v-优秀,tr.seen .v-可做,tr.seen .v-偏紧,tr.seen .v-不建议{color:#78716c !important}
+button.drop{color:#9f1239}
+.v-优秀{color:var(--ok);font-weight:700}
+.v-可做{color:#166534;font-weight:700}
+.v-偏紧{color:var(--warn);font-weight:700}
+.v-不建议{color:var(--bad);font-weight:700}
+.dirty{outline:2px solid #d97706}
+a{color:#1d4ed8;text-decoration:none}
+.foot{position:sticky;bottom:0;background:#1a1714;color:#fffdf8;padding:10px 16px;
+  display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.empty{padding:28px;color:var(--muted)}
+.wrap,.foot{display:none}
+body.unlocked .wrap{display:block}
+body.unlocked .foot{display:flex}
+#gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+#gate form{background:var(--card);border:1px solid var(--line);padding:28px 24px;width:100%;max-width:360px}
+#gate h1{font-size:20px;margin:0 0 8px}
+#gate p{margin:0 0 16px;color:var(--muted);font-size:13px}
+#gate input{width:100%;padding:10px 12px;border:1px solid var(--line);background:#fff;margin:0 0 12px;font-size:16px}
+#gate button{width:100%;padding:10px 12px;border:1px solid #1a1714;background:#1a1714;color:#fffdf8;cursor:pointer}
+#gate-err{color:var(--bad);margin:12px 0 0}
+.pager{display:flex;align-items:center;gap:6px;margin-left:4px}
+.pager button:disabled{opacity:.4;cursor:default}
+.pager select{padding:7px 8px;border:1px solid var(--line);background:var(--card)}
+</style>
+</head>
+<body>
+<div id="gate">
+  <form id="gate-form" autocomplete="off">
+    <h1>优秀选品工作名单</h1>
+    <p>请输入访问密码后进入</p>
+    <input id="gate-pass" type="password" autocomplete="current-password" autofocus>
+    <button type="submit">进入</button>
+    <p id="gate-err" hidden>密码不正确</p>
+  </form>
+</div>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1 id="page-title">玻璃升降开关选品工作名单</h1>
+      <div class="sub" id="meta">run 105 · 判定=优秀；去掉孤独链接；去掉验真价格不通过 / eBay≥$999 / 1688低于¥8 · 已去掉孤独链接 0 条 · 已去掉验真不过/占位价 238 条 · 可离线发给同事</div>
+    </div>
+    <div class="bar">
+      <button type="button" id="btn-export">导出进度 JSON</button>
+      <button type="button" id="btn-import">导入进度</button>
+      <button type="button" class="pri" id="btn-html">下载含进度的 HTML</button>
+      <input type="file" id="file-import" accept="application/json" hidden="">
+    </div>
+  </div>
+  <div class="kpis" id="kpis"><span>候选<b>586</b></span><span>已选中<b>34</b></span><span>已排除<b>10</b></span><span>当前仍优秀<b>579</b></span><span>已改价<b>9</b></span><span>labwork<b>586</b></span></div>
+  <div class="tabs">
+    <button type="button" class="on" data-tab="all" id="tab-all">全部候选</button>
+    <button type="button" data-tab="sel" id="tab-sel">已选中 (34)</button>
+  </div>
+  <div class="bar">
+    <input id="q" type="search" placeholder="搜标题 / ID / OE / 店铺 / 车型">
+    <label>判定 <select id="f-verdict"><option value="">全部</option>
+      <option>优秀</option><option>可做</option><option>偏紧</option><option>不建议</option><option>缺采购价</option><option>验真价格不通过</option></select></label>
+    <label>店铺 <select id="f-store"><option value="">全部店铺</option><option value="labwork">labwork</option></select></label>
+    <label>毛利率
+      <select id="f-margin-sort">
+        <option value="">默认顺序</option>
+        <option value="desc">从高到低</option>
+        <option value="asc">从低到高</option>
+      </select>
+    </label>
+    <label class="range-wrap">1688价 ¥
+      <input id="f-cogs-min" class="range" type="number" min="0" step="1" placeholder="最低">
+      <span>—</span>
+      <input id="f-cogs-max" class="range" type="number" min="0" step="1" placeholder="最高">
+    </label>
+    <button type="button" id="reset">重置筛选</button>
+    <span id="count">显示 586 / 586</span>
+    <span id="pager" class="pager">
+      <button type="button" id="pg-prev">上一页</button>
+      <span id="pg-info">1 / 1</span>
+      <button type="button" id="pg-next">下一页</button>
+      <select id="pg-size">
+        <option value="50">50条/页</option>
+        <option value="80" selected>80条/页</option>
+        <option value="150">150条/页</option>
+      </select>
+    </span>
+  </div>
+  <p class="hint">改 eBay 价或 1688¥ 后点「确定」立刻重算：毛利$ = 售价 − 采购(¥÷7.2) − 头程 − 尾程 − 交易费 − 广告 − 退货。交易费按含税基数(售价×1.075)计算：成交费11.5% + 跨国1.5% + $0.40；广告10%；退货=尾程×2×6.5%。判定：≥40%优秀 / ≥25%可做 / ≥15%偏紧 / 其余不建议。缺采购价补上1688价后也会重算。</p>
+  <table>
+    <thead>
+      <tr>
+        <th class="seq">序号</th><th>操作</th><th>备注</th><th>判定</th><th>毛利$</th><th id="th-margin" class="sort" title="点击切换毛利率排序">毛利%</th><th>标题</th><th>ID / OE</th>
+        <th>同款</th><th>同款Sold</th><th>eBay$</th><th>1688¥</th><th></th>
+        <th>头程</th><th>尾程</th><th>店铺</th><th>链接</th><th>打开</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <p class="empty" id="empty" hidden="">这一页没有符合条件的品。</p>
+</div>
+<div class="foot">
+  <span id="foot-left">已选中 34 条 · 已排除 10 条 · 本机已保存</span>
+  <span>改价后请点确定 · 选中会立刻保存</span>
+</div>
+<script type="application/json" id="wb-enc">{"v":1,"kdf":"pbkdf2-sha256","iter":120000,"salt":"077JK5AWdqcwRSs4zDgyJQ==","iv":"a94JY4pTh9aDzsl5","tag":"Ha44AWzf1J2SYumuMPILGw==","data":"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"}</script>
+<script>
+function startBoard() {
+  function showErr(msg) {
+    var empty = document.getElementById("empty");
+    if (empty) { empty.hidden = false; empty.textContent = msg; }
+  }
+  var DATA;
+  try {
+    DATA = JSON.parse(document.getElementById("wb-data").textContent);
+  } catch (err) {
+    showErr("数据无法读取: " + err);
+    return;
+  }
+  var ITEMS = (DATA.items || []).map(function (x) { return Object.assign({}, x); });
+  var ITEM_MAP = {};
+  ITEMS.forEach(function (it) {
+    ITEM_MAP[it.item_id] = it;
+    if (it.wh_first_leg_usd == null) it.wh_first_leg_usd = 2.86;
+    if (it.wh_last_mile_usd == null) it.wh_last_mile_usd = 4.8;
+    if (!it.ebay_url) it.ebay_url = "https://www.ebay.com/itm/" + it.item_id;
+  });
+  var PAGE_SIZE = 80;
+  var pageIdx = 0;
+  var searchTimer = null;
+  var LIST_ID = DATA.list_id || "excellent";
+  var KEY = "ebay-excellent-wb:" + LIST_ID;
+  var CLOUD = {
+    url: "https://mantledb.sh/v2/labwork-sel-pcm142z5/progress-window-switch",
+    key: "75e44757b964089279098e246735b2998e732d703e9ea1f523bfea323907632e"
+  };
+  var tab = "all";
+  var selected = {};
+  var excluded = {};
+  var seen = {};
+  var notes = {};
+  var FX = DATA.fx || 7.2;
+  var cloudTimer = null;
+  var pushing = false;
+  var lastRemoteAt = "";
+  var lastLocalAt = "";
+  var skipPoll = 0;
+  var syncLabel = "准备同步";
+
+  function calc(price, cogsCny, first, last) {
+    var cogs = Number(cogsCny) / FX;
+    var feeBase = Number(price) * 1.075;
+    var tx = feeBase * 0.115 + feeBase * 0.015 + 0.40;
+    var ad = feeBase * 0.10;
+    var ret = 0.065 * Number(last) * 2;
+    var profit = Number(price) - cogs - Number(first) - Number(last) - tx - ad - ret;
+    var m = Number(price) > 0 ? profit / Number(price) : 0;
+    var v = m >= 0.40 ? "优秀" : m >= 0.25 ? "可做" : m >= 0.15 ? "偏紧" : "不建议";
+    return { profit_wh_usd: Math.round(profit * 100) / 100, margin_wh_pct: Math.round(m * 1000) / 10, verdict: v, ebay_fees_usd: Math.round(tx * 100) / 100 };
+  }
+  function applyEcon(it, force) {
+    var price = Number(it.price_usd);
+    var cogsCny = Number(it.cogs_cny);
+    if (!(price > 0) || !(cogsCny > 0)) return;
+    if (!force && (it.verdict === "缺采购价" || it.verdict === "验真价格不通过")) return;
+    var first = Number(it.wh_first_leg_usd);
+    var last = Number(it.wh_last_mile_usd);
+    if (!(first >= 0)) first = 2.86;
+    if (!(last >= 0)) last = 4.8;
+    var e = calc(price, cogsCny, first, last);
+    it.profit_wh_usd = e.profit_wh_usd;
+    it.margin_wh_pct = e.margin_wh_pct;
+    it.verdict = e.verdict;
+    it.ebay_fees_usd = e.ebay_fees_usd;
+    it.wh_first_leg_usd = first;
+    it.wh_last_mile_usd = last;
+  }
+  function currentState() {
+    var edits = {};
+    ITEMS.forEach(function (it) {
+      if (Number(it.price_usd) !== Number(it.price_usd0) || Number(it.cogs_cny) !== Number(it.cogs_cny0)) {
+        edits[it.item_id] = { price_usd: it.price_usd, cogs_cny: it.cogs_cny };
+      }
+    });
+    var noteMap = {};
+    Object.keys(notes).forEach(function (id) {
+      var t = String(notes[id] || "").trim();
+      if (t) noteMap[id] = t;
+    });
+    return { v: 2, list_id: LIST_ID, selected: Object.keys(selected), excluded: Object.keys(excluded), seen: Object.keys(seen), notes: noteMap, edits: edits, saved_at: new Date().toISOString() };
+  }
+  function applyState(st, persistLocal) {
+    if (!st) return;
+    if (st.list_id && st.list_id !== LIST_ID) return;
+    selected = {};
+    excluded = {};
+    seen = {};
+    notes = {};
+    (st.selected || []).forEach(function (id) { selected[id] = true; });
+    (st.excluded || []).forEach(function (id) { excluded[id] = true; });
+    (st.seen || []).forEach(function (id) { seen[id] = true; });
+    Object.keys(st.notes || {}).forEach(function (id) {
+      var t = String(st.notes[id] || "").trim();
+      if (t) notes[id] = t;
+    });
+    ITEMS.forEach(function (it) {
+      it.note = notes[it.item_id] || "";
+    });
+    ITEMS.forEach(function (it) {
+      it.price_usd = Number(it.price_usd0);
+      it.cogs_cny = Number(it.cogs_cny0);
+    });
+    var edits = st.edits || {};
+    ITEMS.forEach(function (it) {
+      var e = edits[it.item_id];
+      if (!e) return;
+      if (e.price_usd != null) it.price_usd = Number(e.price_usd);
+      if (e.cogs_cny != null) it.cogs_cny = Number(e.cogs_cny);
+      applyEcon(it);
+    });
+    if (st.saved_at) lastRemoteAt = st.saved_at;
+    if (persistLocal !== false) {
+      try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (err) {}
+    }
+  }
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (!raw && DATA.saved_state) raw = JSON.stringify(DATA.saved_state);
+      if (!raw) return;
+      applyState(JSON.parse(raw), false);
+    } catch (err) {}
+  }
+  function setSync(msg) {
+    syncLabel = msg;
+    var el = document.getElementById("foot-left");
+    if (!el) return;
+    el.textContent = "已选中 " + Object.keys(selected).length + " 条 · 已排除 " + Object.keys(excluded).length + " 条 · 已阅 " + Object.keys(seen).length + " 条 · " + msg;
+  }
+  function pushCloud(st) {
+    pushing = true;
+    skipPoll = 2;
+    fetch(CLOUD.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-Mantle-Key": CLOUD.key
+      },
+      body: JSON.stringify(st)
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      lastRemoteAt = st.saved_at;
+      setSync("已同步到协作云端");
+    }).catch(function () {
+      setSync("云端同步失败，已保存在本机");
+    }).then(function () { pushing = false; });
+  }
+  function queueCloudSave(st) {
+    clearTimeout(cloudTimer);
+    setSync("正在同步…");
+    cloudTimer = setTimeout(function () { pushCloud(st || currentState()); }, 400);
+  }
+  function pullCloud(forceRender) {
+    if (pushing || skipPoll > 0) { skipPoll--; return Promise.resolve(); }
+    var ae = document.activeElement;
+    if (ae && (ae.classList.contains("note-in") || ae.classList.contains("edit"))) return Promise.resolve();
+    return fetch(CLOUD.url, {
+      method: "GET",
+      cache: "no-store",
+      headers: {
+        "Accept": "application/json",
+        "X-Mantle-Key": CLOUD.key
+      }
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (st) {
+      if (!st || typeof st !== "object") return;
+      var remoteCount = (st.selected || []).length + (st.excluded || []).length + (st.seen || []).length + Object.keys(st.edits || {}).length + Object.keys(st.notes || {}).length;
+      if (!st.saved_at && remoteCount === 0) return;
+      if (st.saved_at && st.saved_at === lastRemoteAt) return;
+      if (lastLocalAt && st.saved_at && st.saved_at < lastLocalAt) return;
+      applyState(st, true);
+      ITEMS.forEach(applyEcon);
+      setSync("已同步同事最新进度");
+      if (forceRender !== false) render();
+    }).catch(function () {});
+  }
+  function saveState() {
+    var st = currentState();
+    lastLocalAt = st.saved_at;
+    try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (err) {}
+    queueCloudSave(st);
+    return st;
+  }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+  function setNote(id, val) {
+    var t = String(val == null ? "" : val).trim();
+    if (t) notes[id] = t;
+    else delete notes[id];
+    var it = byId(id);
+    if (it) it.note = t;
+  }
+  function flushOpenNotes() {
+    document.querySelectorAll("#tbody input.note-in").forEach(function (inp) {
+      var tr = inp.closest("tr");
+      if (!tr) return;
+      setNote(tr.getAttribute("data-id"), inp.value);
+    });
+  }
+  function money(n, u) {
+    if (n == null || n === "") return "";
+    var x = Number(n);
+    if (isNaN(x)) return "";
+    return (Math.round(x * 100) / 100) + u;
+  }
+  function filtered() {
+    var q = (document.getElementById("q").value || "").trim().toLowerCase();
+    var fv = document.getElementById("f-verdict").value;
+    var fs = (document.getElementById("f-store") || {}).value || "";
+    var minEl = document.getElementById("f-cogs-min");
+    var maxEl = document.getElementById("f-cogs-max");
+    var cmin = minEl ? Number(minEl.value) : NaN;
+    var cmax = maxEl ? Number(maxEl.value) : NaN;
+    var hasMin = !!(minEl && minEl.value !== "" && !isNaN(cmin));
+    var hasMax = !!(maxEl && maxEl.value !== "" && !isNaN(cmax));
+    var rows = ITEMS.filter(function (it) {
+      if (tab === "sel" && !selected[it.item_id]) return false;
+      if (fv && it.verdict !== fv) return false;
+      if (fs && it.store_name !== fs) return false;
+      var cogs = Number(it.cogs_cny);
+      if (hasMin && !(cogs >= cmin)) return false;
+      if (hasMax && !(cogs <= cmax)) return false;
+      if (!q) return true;
+      var blob = [it.title, it.title_zh, it.item_id, it.oe_display, it.store_name, it.vehicle_label, notes[it.item_id] || ""].join(" ").toLowerCase();
+      return blob.indexOf(q) >= 0;
+    });
+    var sort = (document.getElementById("f-margin-sort") || {}).value || "";
+    if (sort === "desc" || sort === "asc") {
+      rows = rows.slice().sort(function (a, b) {
+        var am = Number(a.margin_wh_pct);
+        var bm = Number(b.margin_wh_pct);
+        if (isNaN(am)) am = -1e9;
+        if (isNaN(bm)) bm = -1e9;
+        return sort === "desc" ? bm - am : am - bm;
+      });
+    }
+    return rows;
+  }
+  function updateSortHeader() {
+    var th = document.getElementById("th-margin");
+    if (!th) return;
+    var sort = (document.getElementById("f-margin-sort") || {}).value || "";
+    th.textContent = sort === "desc" ? "毛利% ↓" : sort === "asc" ? "毛利% ↑" : "毛利%";
+  }
+  function render() {
+    var allRows = filtered();
+    var sizeEl = document.getElementById("pg-size");
+    if (sizeEl && Number(sizeEl.value) > 0) PAGE_SIZE = Number(sizeEl.value);
+    var pages = Math.max(1, Math.ceil(allRows.length / PAGE_SIZE));
+    if (pageIdx > pages - 1) pageIdx = pages - 1;
+    if (pageIdx < 0) pageIdx = 0;
+    var start = pageIdx * PAGE_SIZE;
+    var rows = allRows.slice(start, start + PAGE_SIZE);
+    updateSortHeader();
+    var tb = document.getElementById("tbody");
+    document.getElementById("empty").hidden = allRows.length > 0;
+    tb.innerHTML = rows.map(function (it, i) {
+      var on = !!selected[it.item_id];
+      var drop = !!excluded[it.item_id];
+      var read = !!seen[it.item_id];
+      var rowCls = (drop ? "excluded " : "") + (on && !drop ? "picked " : "") + (read ? "seen" : "");
+      return "<tr class=\"" + rowCls.trim() + "\" data-id=\"" + esc(it.item_id) + "\">" +
+        "<td class=\"seq\">" + (start + i + 1) + "</td>" +
+        "<td class=\"acts\">" +
+          "<button type=\"button\" class=\"sel\">" + (on ? "取消选中" : "选中") + "</button>" +
+          "<button type=\"button\" class=\"drop\">" + (drop ? "取消排除" : "排除") + "</button>" +
+          "<button type=\"button\" class=\"seen\">" + (read ? "取消已阅" : "已阅") + "</button>" +
+        "</td>" +
+        "<td class=\"note\"><input class=\"note-in\" type=\"text\" maxlength=\"200\" placeholder=\"备注\" value=\"" + esc(notes[it.item_id] || it.note || "") + "\"/></td>" +
+        "<td class=\"v-" + esc(it.verdict) + "\">" + esc(it.verdict) + "</td>" +
+        "<td>" + money(it.profit_wh_usd, "$") + "</td>" +
+        "<td>" + (it.margin_wh_pct == null ? "" : it.margin_wh_pct + "%") + "</td>" +
+        "<td class=\"title\"><b>" + esc(it.title_zh || it.title) + "</b><div>" + esc((it.title || "").slice(0, 90)) + "</div>" +
+          (it.vehicle_label ? "<div>" + esc(it.vehicle_label) + "</div>" : "") +
+          ((notes[it.item_id] || it.note) ? "<div class=\"note-preview\">备注：" + esc(notes[it.item_id] || it.note) + "</div>" : "") + "</td>" +
+        "<td><a href=\"" + esc(it.ebay_url || ("https://www.ebay.com/itm/" + it.item_id)) + "\" target=\"_blank\">" + esc(it.item_id) + "</a><div>" + esc(it.oe_display) + "</div></td>" +
+        "<td>" + esc(it.same_listing_count) + "</td>" +
+        "<td>" + esc(it.same_listing_sold_sum) + "</td>" +
+        "<td><input class=\"edit ebay\" type=\"number\" step=\"0.01\" value=\"" + esc(it.price_usd) + "\"/></td>" +
+        "<td><input class=\"edit cogs\" type=\"number\" step=\"0.01\" value=\"" + esc(it.cogs_cny) + "\"/></td>" +
+        "<td><button type=\"button\" class=\"ok\">确定</button></td>" +
+        "<td>" + money(it.wh_first_leg_usd, "$") + "</td>" +
+        "<td>" + money(it.wh_last_mile_usd, "$") + "</td>" +
+        "<td>" + esc(it.store_name) + "</td>" +
+        "<td><a class=\"lnk-ebay\" href=\"" + esc(it.ebay_url || ("https://www.ebay.com/itm/" + it.item_id)) + "\" target=\"_blank\" rel=\"noopener\">eBay</a>" +
+          (it.cogs_offer_url ? " · <a class=\"lnk-1688\" href=\"" + esc(it.cogs_offer_url) + "\" target=\"_blank\" rel=\"noopener\" title=\"" + esc(it.cogs_offer_title) + "\">1688</a>" : "") +
+        "</td>" +
+        "<td><button type=\"button\" class=\"open-both\"" +
+          (it.cogs_offer_url ? "" : " title=\"没有 1688 链接，只打开 eBay\"") +
+          ">打开</button></td></tr>";
+    }).join("");
+    var nSel = Object.keys(selected).length;
+    var nDrop = Object.keys(excluded).length;
+    var nSeen = Object.keys(seen).length;
+    document.getElementById("tab-sel").textContent = "已选中 (" + nSel + ")";
+    document.getElementById("count").textContent = "显示 " + allRows.length + " / " + ITEMS.length;
+    var info = document.getElementById("pg-info");
+    if (info) info.textContent = (pageIdx + 1) + " / " + pages;
+    var prev = document.getElementById("pg-prev");
+    var next = document.getElementById("pg-next");
+    if (prev) prev.disabled = pageIdx <= 0;
+    if (next) next.disabled = pageIdx >= pages - 1;
+    var excel = ITEMS.filter(function (it) { return it.verdict === "优秀"; }).length;
+    var storeBits = "";
+    var byStore = {};
+    ITEMS.forEach(function (it) {
+      var s = it.store_name || "?";
+      byStore[s] = (byStore[s] || 0) + 1;
+    });
+    Object.keys(byStore).sort().forEach(function (s) {
+      storeBits += "<span>" + s + "<b>" + byStore[s] + "</b></span>";
+    });
+    document.getElementById("kpis").innerHTML =
+      "<span>候选<b>" + ITEMS.length + "</b></span>" +
+      "<span>已选中<b>" + nSel + "</b></span>" +
+      "<span>已排除<b>" + nDrop + "</b></span>" +
+      "<span>已阅<b>" + nSeen + "</b></span>" +
+      "<span>当前仍优秀<b>" + excel + "</b></span>" +
+      "<span>已改价<b>" + ITEMS.filter(function (it) { return Number(it.price_usd) !== Number(it.price_usd0) || Number(it.cogs_cny) !== Number(it.cogs_cny0); }).length + "</b></span>" +
+      storeBits;
+    document.getElementById("foot-left").textContent = "已选中 " + nSel + " 条 · 已排除 " + nDrop + " 条 · 已阅 " + nSeen + " 条 · " + syncLabel;
+  }
+  function byId(id) {
+    return ITEM_MAP[id] || null;
+  }
+  function rerenderFromTop() { pageIdx = 0; render(); }
+  function openTab(url) {
+    if (!url) return;
+    window.open(url, "_blank", "noopener");
+  }
+  document.getElementById("tbody").addEventListener("click", function (ev) {
+    var tr = ev.target.closest("tr");
+    if (!tr) return;
+    var it = byId(tr.getAttribute("data-id"));
+    if (!it) return;
+    if (ev.target.classList.contains("sel") || ev.target.classList.contains("drop") || ev.target.classList.contains("seen") || ev.target.classList.contains("ok")) {
+      flushOpenNotes();
+    }
+    if (ev.target.classList.contains("sel")) {
+      if (selected[it.item_id]) delete selected[it.item_id];
+      else { selected[it.item_id] = true; delete excluded[it.item_id]; }
+      saveState();
+      render();
+      return;
+    }
+    if (ev.target.classList.contains("drop")) {
+      if (excluded[it.item_id]) delete excluded[it.item_id];
+      else { excluded[it.item_id] = true; delete selected[it.item_id]; }
+      saveState();
+      render();
+      return;
+    }
+    if (ev.target.classList.contains("seen")) {
+      if (seen[it.item_id]) delete seen[it.item_id];
+      else seen[it.item_id] = true;
+      saveState();
+      render();
+      return;
+    }
+    if (ev.target.classList.contains("open-both")) {
+      var ebay = it.ebay_url || ("https://www.ebay.com/itm/" + it.item_id);
+      var ali = it.cogs_offer_url || "";
+      if (ali) openTab(ali);
+      openTab(ebay);
+      return;
+    }
+    if (ev.target.closest("a.lnk-ebay") || ev.target.closest("a.lnk-1688")) {
+      return;
+    }
+    if (ev.target.classList.contains("ok")) {
+      var p = Number(tr.querySelector(".ebay").value);
+      var c = Number(tr.querySelector(".cogs").value);
+      if (!(p > 0) || !(c > 0)) { alert("请填写有效的 eBay 价和 1688 价"); return; }
+      it.price_usd = p;
+      it.cogs_cny = c;
+      applyEcon(it, true);
+      saveState();
+      render();
+      setSync("已重算毛利 " + money(it.profit_wh_usd, "$") + " / " + it.margin_wh_pct + "% · " + it.verdict);
+    }
+  });
+  document.getElementById("tbody").addEventListener("input", function (ev) {
+    if (ev.target.classList.contains("edit")) ev.target.classList.add("dirty");
+    if (ev.target.classList.contains("note-in")) {
+      var tr = ev.target.closest("tr");
+      if (!tr) return;
+      var it = byId(tr.getAttribute("data-id"));
+      if (!it) return;
+      var val = ev.target.value;
+      setNote(it.item_id, val);
+      saveState();
+      var preview = tr.querySelector(".note-preview");
+      var t = String(notes[it.item_id] || "").trim();
+      if (t) {
+        if (!preview) {
+          preview = document.createElement("div");
+          preview.className = "note-preview";
+          var titleCell = tr.querySelector("td.title");
+          if (titleCell) titleCell.appendChild(preview);
+        }
+        preview.textContent = "备注：" + t;
+      } else if (preview) {
+        preview.remove();
+      }
+    }
+  });
+  document.querySelectorAll(".tabs button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      flushOpenNotes();
+      saveState();
+      tab = btn.getAttribute("data-tab");
+      document.querySelectorAll(".tabs button").forEach(function (b) { b.classList.toggle("on", b === btn); });
+      render();
+    });
+  });
+  document.getElementById("q").addEventListener("input", function () {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(rerenderFromTop, 180);
+  });
+  document.getElementById("f-verdict").addEventListener("change", rerenderFromTop);
+  var storeSel = document.getElementById("f-store");
+  if (storeSel) storeSel.addEventListener("change", rerenderFromTop);
+  var marginSort = document.getElementById("f-margin-sort");
+  if (marginSort) marginSort.addEventListener("change", rerenderFromTop);
+  ["f-cogs-min", "f-cogs-max"].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener("input", rerenderFromTop);
+  });
+  var thMargin = document.getElementById("th-margin");
+  if (thMargin) {
+    thMargin.addEventListener("click", function () {
+      var sel = document.getElementById("f-margin-sort");
+      if (!sel) return;
+      sel.value = sel.value === "desc" ? "asc" : sel.value === "asc" ? "" : "desc";
+      rerenderFromTop();
+    });
+  }
+  document.getElementById("reset").addEventListener("click", function () {
+    document.getElementById("q").value = "";
+    document.getElementById("f-verdict").value = "";
+    if (storeSel) storeSel.value = "";
+    if (marginSort) marginSort.value = "";
+    var cmin = document.getElementById("f-cogs-min");
+    var cmax = document.getElementById("f-cogs-max");
+    if (cmin) cmin.value = "";
+    if (cmax) cmax.value = "";
+    rerenderFromTop();
+  });
+  var pgPrev = document.getElementById("pg-prev");
+  var pgNext = document.getElementById("pg-next");
+  var pgSize = document.getElementById("pg-size");
+  if (pgPrev) pgPrev.addEventListener("click", function () { if (pageIdx > 0) { pageIdx--; render(); } });
+  if (pgNext) pgNext.addEventListener("click", function () { pageIdx++; render(); });
+  if (pgSize) pgSize.addEventListener("change", rerenderFromTop);
+  document.getElementById("btn-export").addEventListener("click", function () {
+    var st = saveState();
+    st.items_selected = ITEMS.filter(function (it) { return selected[it.item_id]; }).map(function (it) {
+      var row = Object.assign({}, it);
+      row.note = notes[it.item_id] || "";
+      return row;
+    });
+    var blob = new Blob([JSON.stringify(st, null, 2)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = LIST_ID + "-进度.json";
+    a.click();
+  });
+  document.getElementById("btn-import").addEventListener("click", function () {
+    document.getElementById("file-import").click();
+  });
+  document.getElementById("file-import").addEventListener("change", function (ev) {
+    var f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var st = JSON.parse(reader.result);
+        localStorage.setItem(KEY, JSON.stringify(st));
+        selected = {};
+        excluded = {};
+        seen = {};
+        notes = {};
+        loadState();
+        saveState();
+        render();
+      } catch (e) { alert("进度文件无法读取"); }
+    };
+    reader.readAsText(f, "utf-8");
+    ev.target.value = "";
+  });
+  document.getElementById("btn-html").addEventListener("click", function () {
+    var st = saveState();
+    var copy = JSON.parse(JSON.stringify(DATA));
+    copy.saved_state = st;
+    copy.items = ITEMS;
+    var html = document.documentElement.outerHTML;
+    var token = "id=\"wb-data\"";
+    var at = html.indexOf(token);
+    var start = html.indexOf(">", at) + 1;
+    var end = html.indexOf("<" + "/script>", start);
+    var payload = JSON.stringify(copy).replace(/</g, "\\u003c");
+    var injected = html.slice(0, start) + payload + html.slice(end);
+    var blob = new Blob(["<!DOCTYPE html>\n" + injected], { type: "text/html;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "优秀选品工作名单-含进度.html";
+    a.click();
+  });
+
+  document.getElementById("meta").textContent =
+    "run " + (DATA.board_run_id || "") + " · " + (DATA.filter || "") +
+    " · 已去掉孤独链接 " + (DATA.dropped_lonely || 0) +
+    " 条 · 已去掉验真不过/占位价 " + (DATA.dropped_unreal || 0) +
+    " 条 · 可离线发给同事";
+  if (DATA.title) {
+    document.title = DATA.title;
+    var h = document.getElementById("page-title");
+    if (h) h.textContent = DATA.title;
+  }
+  var storeSelInit = document.getElementById("f-store");
+  if (storeSelInit) {
+    var seenStore = {};
+    ITEMS.forEach(function (it) {
+      var s = it.store_name || "";
+      if (s) seenStore[s] = true;
+    });
+    Object.keys(seenStore).sort().forEach(function (s) {
+      var o = document.createElement("option");
+      o.value = s;
+      o.textContent = s;
+      storeSelInit.appendChild(o);
+    });
+  }
+  try {
+    loadState();
+    ITEMS.forEach(applyEcon);
+    render();
+    pullCloud(true);
+    setInterval(function () { pullCloud(true); }, 4000);
+  } catch (err) {
+    showErr("页面初始化失败: " + err);
+  }
+}
+
+function b64ToBytes(s) {
+  var bin = atob(s);
+  var out = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function deriveKey(password, salt, iter) {
+  return crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]).then(function (km) {
+    return crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt: salt, iterations: iter, hash: "SHA-256" },
+      km,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["decrypt"]
+    );
+  });
+}
+function unlockWith(password) {
+  var meta = JSON.parse(document.getElementById("wb-enc").textContent);
+  var salt = b64ToBytes(meta.salt);
+  var iv = b64ToBytes(meta.iv);
+  var tag = b64ToBytes(meta.tag);
+  var data = b64ToBytes(meta.data);
+  var packed = new Uint8Array(data.length + tag.length);
+  packed.set(data);
+  packed.set(tag, data.length);
+  return deriveKey(password, salt, meta.iter || 120000).then(function (key) {
+    return crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, packed);
+  }).then(function (buf) {
+    var text = new TextDecoder().decode(buf);
+    var el = document.getElementById("wb-data");
+    if (!el) {
+      el = document.createElement("script");
+      el.type = "application/json";
+      el.id = "wb-data";
+      document.body.appendChild(el);
+    }
+    el.textContent = text;
+    document.body.classList.add("unlocked");
+    var gate = document.getElementById("gate");
+    if (gate) gate.remove();
+    startBoard();
+  });
+}
+document.getElementById("gate-form").addEventListener("submit", function (ev) {
+  ev.preventDefault();
+  var err = document.getElementById("gate-err");
+  var btn = ev.target.querySelector("button");
+  var pass = document.getElementById("gate-pass").value;
+  err.hidden = true;
+  btn.disabled = true;
+  unlockWith(pass).then(function () {
+    btn.disabled = false;
+  }).catch(function () {
+    btn.disabled = false;
+    err.hidden = false;
+    document.getElementById("gate-pass").select();
+  });
+});
+</script>
+
+
+</body></html>
