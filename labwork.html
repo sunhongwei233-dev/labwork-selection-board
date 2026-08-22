@@ -118,7 +118,7 @@ body.unlocked .foot{display:flex}
     <button type="button" id="reset">重置筛选</button>
     <span id="count">显示 586 / 586</span>
   </div>
-  <p class="hint">改 eBay 价或 1688 价后点「确定」重算美仓毛利（含税成交费 11.5%+跨国 1.5%+$0.40、广告 10%、退货 6.5%、汇率 7.2）。选中的品进「已选中」。进度会同步到云端，同一链接多人可同时改数；大约 4 秒内互相看到最新结果。</p>
+  <p class="hint">改 eBay 价或 1688 价后点「确定」重算美仓毛利（含税成交费 11.5%+跨国 1.5%+$0.40、广告 10%、退货 6.5%、汇率 7.2）。选中的品进「已选中」。进度按商品合并：三人同时改不会整表互挤，同一条以最后一次操作为准，大约 4 秒内看到。</p>
   <table>
     <thead>
       <tr>
@@ -161,6 +161,8 @@ function startBoard() {
   var excluded = {};
   var seen = {};
   var notes = {};
+  var itemOps = {};
+  var lastFp = "";
   var FX = DATA.fx || 7.2;
   var cloudTimer = null;
   var pushing = false;
@@ -187,51 +189,160 @@ function startBoard() {
     it.verdict = e.verdict;
     it.ebay_fees_usd = e.ebay_fees_usd;
   }
-  function currentState() {
+
+  function nowIso() { return new Date().toISOString(); }
+  function findItem(id) {
+    if (typeof byId === "function") return byId(id);
+    if (typeof ITEM_MAP !== "undefined" && ITEM_MAP[id]) return ITEM_MAP[id];
+    for (var i = 0; i < ITEMS.length; i++) if (ITEMS[i].item_id === id) return ITEMS[i];
+    return null;
+  }
+  function recordOp(id, patch) {
+    var prev = itemOps[id] || {};
+    var it = findItem(id);
+    var next = {
+      at: nowIso(),
+      sel: !!selected[id],
+      drop: !!excluded[id],
+      seen: !!seen[id],
+      note: notes[id] || ""
+    };
+    if (it) {
+      next.price_usd = it.price_usd;
+      next.cogs_cny = it.cogs_cny;
+    } else {
+      if (prev.price_usd != null) next.price_usd = prev.price_usd;
+      if (prev.cogs_cny != null) next.cogs_cny = prev.cogs_cny;
+    }
+    if (prev.econ) next.econ = true;
+    if (patch) Object.keys(patch).forEach(function (k) { next[k] = patch[k]; });
+    itemOps[id] = next;
+  }
+  function fingerprint(st) {
+    var items = (st && st.items) || {};
+    return Object.keys(items).sort().map(function (id) {
+      return id + ":" + ((items[id] && items[id].at) || "");
+    }).join("|");
+  }
+  function normalizeState(st) {
+    var out = { v: 3, list_id: LIST_ID, items: {}, saved_at: "" };
+    if (!st || typeof st !== "object") return out;
+    out.list_id = st.list_id || LIST_ID;
+    if (st.v >= 3 && st.items && !Array.isArray(st.items)) {
+      Object.keys(st.items).forEach(function (id) {
+        out.items[id] = Object.assign({}, st.items[id]);
+      });
+      out.saved_at = st.saved_at || "";
+      return out;
+    }
+    var at = st.saved_at || nowIso();
+    function touch(id) {
+      if (!out.items[id]) out.items[id] = { at: at, sel: false, drop: false, seen: false, note: "" };
+      return out.items[id];
+    }
+    (st.selected || []).forEach(function (id) { touch(id).sel = true; });
+    (st.excluded || []).forEach(function (id) { touch(id).drop = true; });
+    (st.seen || []).forEach(function (id) { touch(id).seen = true; });
+    Object.keys(st.notes || {}).forEach(function (id) {
+      var t = String(st.notes[id] || "").trim();
+      if (t) touch(id).note = t;
+    });
+    Object.keys(st.edits || {}).forEach(function (id) {
+      var e = st.edits[id] || {};
+      var rec = touch(id);
+      if (e.price_usd != null) rec.price_usd = e.price_usd;
+      if (e.cogs_cny != null) rec.cogs_cny = e.cogs_cny;
+      rec.econ = true;
+    });
+    out.saved_at = at;
+    return out;
+  }
+  function mergeStates(a, b) {
+    var out = { v: 3, list_id: LIST_ID, items: {}, saved_at: "" };
+    var ids = {};
+    Object.keys((a && a.items) || {}).forEach(function (id) { ids[id] = 1; });
+    Object.keys((b && b.items) || {}).forEach(function (id) { ids[id] = 1; });
+    var latest = "";
+    Object.keys(ids).forEach(function (id) {
+      var x = ((a && a.items) || {})[id];
+      var y = ((b && b.items) || {})[id];
+      var pick = !x ? y : !y ? x : ((y.at || "") >= (x.at || "") ? y : x);
+      out.items[id] = Object.assign({}, pick);
+      if ((pick.at || "") > latest) latest = pick.at || "";
+    });
+    out.saved_at = latest || nowIso();
+    return out;
+  }
+  function arraysFromItems(items) {
+    var selectedIds = [];
+    var excludedIds = [];
+    var seenIds = [];
+    var noteMap = {};
     var edits = {};
-    ITEMS.forEach(function (it) {
-      if (Number(it.price_usd) !== Number(it.price_usd0) || Number(it.cogs_cny) !== Number(it.cogs_cny0)) {
-        edits[it.item_id] = { price_usd: it.price_usd, cogs_cny: it.cogs_cny };
+    Object.keys(items || {}).forEach(function (id) {
+      var r = items[id] || {};
+      if (r.sel) selectedIds.push(id);
+      if (r.drop) excludedIds.push(id);
+      if (r.seen) seenIds.push(id);
+      if (r.note) noteMap[id] = r.note;
+      if (r.price_usd != null || r.cogs_cny != null) {
+        edits[id] = {};
+        if (r.price_usd != null) edits[id].price_usd = r.price_usd;
+        if (r.cogs_cny != null) edits[id].cogs_cny = r.cogs_cny;
       }
     });
-    var noteMap = {};
-    Object.keys(notes).forEach(function (id) {
-      var t = String(notes[id] || "").trim();
-      if (t) noteMap[id] = t;
-    });
-    return { v: 2, list_id: LIST_ID, selected: Object.keys(selected), excluded: Object.keys(excluded), seen: Object.keys(seen), notes: noteMap, edits: edits, saved_at: new Date().toISOString() };
+    return { selected: selectedIds, excluded: excludedIds, seen: seenIds, notes: noteMap, edits: edits };
+  }
+  function currentState() {
+    var extra = arraysFromItems(itemOps);
+    return {
+      v: 3,
+      list_id: LIST_ID,
+      items: itemOps,
+      selected: extra.selected,
+      excluded: extra.excluded,
+      seen: extra.seen,
+      notes: extra.notes,
+      edits: extra.edits,
+      saved_at: nowIso()
+    };
   }
   function applyState(st, persistLocal) {
     if (!st) return;
+    if (st.list_id && st.list_id !== LIST_ID) return;
+    var norm = normalizeState(st);
+    itemOps = {};
+    Object.keys(norm.items || {}).forEach(function (id) {
+      itemOps[id] = Object.assign({}, norm.items[id]);
+    });
     selected = {};
     excluded = {};
     seen = {};
     notes = {};
-    (st.selected || []).forEach(function (id) { selected[id] = true; });
-    (st.excluded || []).forEach(function (id) { excluded[id] = true; });
-    (st.seen || []).forEach(function (id) { seen[id] = true; });
-    Object.keys(st.notes || {}).forEach(function (id) {
-      var t = String(st.notes[id] || "").trim();
-      if (t) notes[id] = t;
-    });
-    ITEMS.forEach(function (it) {
-      it.note = notes[it.item_id] || "";
-    });
     ITEMS.forEach(function (it) {
       it.price_usd = Number(it.price_usd0);
       it.cogs_cny = Number(it.cogs_cny0);
+      it.note = "";
     });
-    var edits = st.edits || {};
-    ITEMS.forEach(function (it) {
-      var e = edits[it.item_id];
-      if (!e) return;
-      if (e.price_usd != null) it.price_usd = Number(e.price_usd);
-      if (e.cogs_cny != null) it.cogs_cny = Number(e.cogs_cny);
-      applyEcon(it);
+    Object.keys(itemOps).forEach(function (id) {
+      var r = itemOps[id] || {};
+      if (r.sel) selected[id] = true;
+      if (r.drop) excluded[id] = true;
+      if (r.seen) seen[id] = true;
+      if (r.note) notes[id] = r.note;
+      var it = findItem(id);
+      if (!it) return;
+      it.note = r.note || "";
+      if (r.price_usd != null) it.price_usd = Number(r.price_usd);
+      if (r.cogs_cny != null) it.cogs_cny = Number(r.cogs_cny);
+      var priceChanged = (r.price_usd != null && Number(r.price_usd) !== Number(it.price_usd0))
+        || (r.cogs_cny != null && Number(r.cogs_cny) !== Number(it.cogs_cny0));
+      if ((r.econ || priceChanged) && typeof applyEcon === "function") applyEcon(it, true);
     });
-    if (st.saved_at) lastRemoteAt = st.saved_at;
+    if (norm.saved_at) lastRemoteAt = norm.saved_at;
+    lastFp = fingerprint(norm);
     if (persistLocal !== false) {
-      try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (err) {}
+      try { localStorage.setItem(KEY, JSON.stringify(norm)); } catch (err) {}
     }
   }
   function loadState() {
@@ -248,24 +359,41 @@ function startBoard() {
     if (!el) return;
     el.textContent = "已选中 " + Object.keys(selected).length + " 条 · 已排除 " + Object.keys(excluded).length + " 条 · 已阅 " + Object.keys(seen).length + " 条 · " + msg;
   }
-  function pushCloud(st) {
-    pushing = true;
-    skipPoll = 2;
-    fetch(CLOUD.url, {
+  function cloudHeaders(withJson) {
+    var h = { "Accept": "application/json", "X-Mantle-Key": CLOUD.key };
+    if (withJson) h["Content-Type"] = "application/json";
+    return h;
+  }
+  function postState(st) {
+    return fetch(CLOUD.url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "X-Mantle-Key": CLOUD.key
-      },
+      headers: cloudHeaders(true),
       body: JSON.stringify(st)
     }).then(function (r) {
       if (!r.ok) throw new Error("HTTP " + r.status);
       lastRemoteAt = st.saved_at;
-      setSync("已同步到协作云端");
-    }).catch(function () {
-      setSync("云端同步失败，已保存在本机");
-    }).then(function () { pushing = false; });
+      lastFp = fingerprint(st);
+      setSync("已同步（每条以最后一次操作为准）");
+      return st;
+    });
+  }
+  function pushCloud(st) {
+    pushing = true;
+    skipPoll = 2;
+    fetch(CLOUD.url, { method: "GET", cache: "no-store", headers: cloudHeaders(false) })
+      .then(function (r) { return r.ok ? r.json() : {}; })
+      .then(function (remote) {
+        var merged = mergeStates(normalizeState(remote), normalizeState(st || currentState()));
+        var extra = arraysFromItems(merged.items);
+        merged.selected = extra.selected;
+        merged.excluded = extra.excluded;
+        merged.seen = extra.seen;
+        merged.notes = extra.notes;
+        merged.edits = extra.edits;
+        return postState(merged);
+      })
+      .catch(function () { setSync("云端同步失败，已保存在本机"); })
+      .then(function () { pushing = false; });
   }
   function queueCloudSave(st) {
     clearTimeout(cloudTimer);
@@ -279,23 +407,22 @@ function startBoard() {
     return fetch(CLOUD.url, {
       method: "GET",
       cache: "no-store",
-      headers: {
-        "Accept": "application/json",
-        "X-Mantle-Key": CLOUD.key
-      }
+      headers: cloudHeaders(false)
     }).then(function (r) {
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.json();
-    }).then(function (st) {
-      if (!st || typeof st !== "object") return;
-      var remoteCount = (st.selected || []).length + (st.excluded || []).length + (st.seen || []).length + Object.keys(st.edits || {}).length + Object.keys(st.notes || {}).length;
-      if (!st.saved_at && remoteCount === 0) return;
-      if (st.saved_at && st.saved_at === lastRemoteAt) return;
-      if (lastLocalAt && st.saved_at && st.saved_at < lastLocalAt) return;
-      applyState(st, true);
-      ITEMS.forEach(applyEcon);
-      setSync("已同步同事最新进度");
+    }).then(function (remote) {
+      if (!remote || typeof remote !== "object") return;
+      var rem = normalizeState(remote);
+      if (!rem.saved_at && !Object.keys(rem.items).length) return;
+      var loc = normalizeState(currentState());
+      var merged = mergeStates(rem, loc);
+      var fp = fingerprint(merged);
+      if (fp === lastFp) return;
+      applyState(merged, true);
+      setSync("已合并同事进度（每条取最后一次）");
       if (forceRender !== false) render();
+      if (fp !== fingerprint(rem)) queueCloudSave(merged);
     }).catch(function () {});
   }
   function saveState() {
@@ -305,6 +432,7 @@ function startBoard() {
     queueCloudSave(st);
     return st;
   }
+
   function esc(s) {
     return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   }
@@ -314,6 +442,7 @@ function startBoard() {
     else delete notes[id];
     var it = byId(id);
     if (it) it.note = t;
+    recordOp(id, { note: t });
   }
   function flushOpenNotes() {
     document.querySelectorAll("#tbody input.note-in").forEach(function (inp) {
@@ -451,6 +580,7 @@ function startBoard() {
     if (ev.target.classList.contains("sel")) {
       if (selected[it.item_id]) delete selected[it.item_id];
       else { selected[it.item_id] = true; delete excluded[it.item_id]; }
+      recordOp(it.item_id);
       saveState();
       render();
       return;
@@ -458,6 +588,7 @@ function startBoard() {
     if (ev.target.classList.contains("drop")) {
       if (excluded[it.item_id]) delete excluded[it.item_id];
       else { excluded[it.item_id] = true; delete selected[it.item_id]; }
+      recordOp(it.item_id);
       saveState();
       render();
       return;
@@ -465,6 +596,7 @@ function startBoard() {
     if (ev.target.classList.contains("seen")) {
       if (seen[it.item_id]) delete seen[it.item_id];
       else seen[it.item_id] = true;
+      recordOp(it.item_id);
       saveState();
       render();
       return;
@@ -486,6 +618,7 @@ function startBoard() {
       it.price_usd = p;
       it.cogs_cny = c;
       applyEcon(it);
+      recordOp(it.item_id, { econ: true });
       saveState();
       render();
     }
