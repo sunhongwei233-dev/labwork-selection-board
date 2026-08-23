@@ -191,7 +191,7 @@ function startBoard() {
     var feeBase = Number(price) * 1.075;
     var tx = feeBase * 0.115 + feeBase * 0.015 + 0.40;
     var ad = feeBase * 0.10;
-    var ret = 0.065 * Number(last) * 2;
+    var ret = 0.065 * Number(last);
     var profit = Number(price) - cogs - Number(first) - Number(last) - tx - ad - ret;
     var m = Number(price) > 0 ? profit / Number(price) : 0;
     var v = m >= 0.40 ? "优秀" : m >= 0.25 ? "可做" : m >= 0.15 ? "偏紧" : "不建议";
