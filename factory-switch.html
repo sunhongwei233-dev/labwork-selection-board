@@ -375,8 +375,7 @@ function startBoard() {
     return fetch(CLOUD.url, {
       method: "POST",
       headers: cloudHeaders(true),
-      body: JSON.stringify(st),
-      keepalive: true
+      body: JSON.stringify(st)
     }).then(function (r) {
       if (!r.ok) throw new Error("HTTP " + r.status);
       lastRemoteAt = st.saved_at;
@@ -388,10 +387,15 @@ function startBoard() {
   function pushCloud(st) {
     pushing = true;
     skipPoll = 2;
+    var local = normalizeState(st || currentState());
     fetch(CLOUD.url, { method: "GET", cache: "no-store", headers: cloudHeaders(false) })
       .then(function (r) { return r.ok ? r.json() : {}; })
       .then(function (remote) {
-        var merged = mergeStates(normalizeState(remote), normalizeState(st || currentState()));
+        var merged = mergeStates(normalizeState(remote), local);
+        if (!Object.keys(merged.items).length) {
+          setSync("已同步（每条以最后一次操作为准）");
+          return merged;
+        }
         var extra = arraysFromItems(merged.items);
         merged.selected = extra.selected;
         merged.excluded = extra.excluded;
@@ -786,23 +790,27 @@ function startBoard() {
   }
   function flushCloudNow() {
     try {
+      if (!Object.keys(itemOps).length) return;
       var st = currentState();
       localStorage.setItem(KEY, JSON.stringify(st));
       clearTimeout(cloudTimer);
-      pushCloud(st);
+      fetch(CLOUD.url, {
+        method: "POST",
+        headers: cloudHeaders(true),
+        body: JSON.stringify(st),
+        keepalive: true
+      }).catch(function () {});
     } catch (err) {}
   }
   window.addEventListener("pagehide", flushCloudNow);
-  document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "hidden") flushCloudNow();
-  });
   try {
     loadState();
     ITEMS.forEach(applyEcon);
     render();
-    pullCloud(true);
+    pullCloud(true).then(function () {
+      if (Object.keys(itemOps).length) queueCloudSave(currentState());
+    });
     setInterval(function () { pullCloud(true); }, 4000);
-    if (Object.keys(itemOps).length) queueCloudSave(currentState());
   } catch (err) {
     showErr("页面初始化失败: " + err);
   }
