@@ -74,7 +74,7 @@ body.unlocked .foot{display:flex}
 <div id="gate">
   <form id="gate-form" autocomplete="off">
     <h1>优秀选品工作名单</h1>
-    <p>请输入访问密码后进入</p>
+    <p>请输入访问密码。本机登录后刷新不用再输入；选中/改价会同步给同事。</p>
     <input id="gate-pass" type="password" autocomplete="current-password" autofocus>
     <button type="submit">进入</button>
     <p id="gate-err" hidden>密码不正确</p>
@@ -375,7 +375,8 @@ function startBoard() {
     return fetch(CLOUD.url, {
       method: "POST",
       headers: cloudHeaders(true),
-      body: JSON.stringify(st)
+      body: JSON.stringify(st),
+      keepalive: true
     }).then(function (r) {
       if (!r.ok) throw new Error("HTTP " + r.status);
       lastRemoteAt = st.saved_at;
@@ -416,6 +417,7 @@ function startBoard() {
       cache: "no-store",
       headers: cloudHeaders(false)
     }).then(function (r) {
+      if (r.status === 404) return { v: 3, list_id: LIST_ID, items: {}, saved_at: "" };
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.json();
     }).then(function (remote) {
@@ -782,12 +784,25 @@ function startBoard() {
       storeSelInit.appendChild(o);
     });
   }
+  function flushCloudNow() {
+    try {
+      var st = currentState();
+      localStorage.setItem(KEY, JSON.stringify(st));
+      clearTimeout(cloudTimer);
+      pushCloud(st);
+    } catch (err) {}
+  }
+  window.addEventListener("pagehide", flushCloudNow);
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") flushCloudNow();
+  });
   try {
     loadState();
     ITEMS.forEach(applyEcon);
     render();
     pullCloud(true);
     setInterval(function () { pullCloud(true); }, 4000);
+    if (Object.keys(itemOps).length) queueCloudSave(currentState());
   } catch (err) {
     showErr("页面初始化失败: " + err);
   }
@@ -837,6 +852,19 @@ function unlockWith(password) {
     startBoard();
   });
 }
+var GATE_MEM = "ebay-collab-gate-pass";
+function rememberedGate() {
+  try { return sessionStorage.getItem(GATE_MEM) || localStorage.getItem(GATE_MEM) || ""; } catch (err) { return ""; }
+}
+function rememberGate(password) {
+  try {
+    sessionStorage.setItem(GATE_MEM, password);
+    localStorage.setItem(GATE_MEM, password);
+  } catch (err) {}
+}
+function forgetGate() {
+  try { sessionStorage.removeItem(GATE_MEM); localStorage.removeItem(GATE_MEM); } catch (err) {}
+}
 document.getElementById("gate-form").addEventListener("submit", function (ev) {
   ev.preventDefault();
   var err = document.getElementById("gate-err");
@@ -845,6 +873,7 @@ document.getElementById("gate-form").addEventListener("submit", function (ev) {
   err.hidden = true;
   btn.disabled = true;
   unlockWith(pass).then(function () {
+    rememberGate(pass);
     btn.disabled = false;
   }).catch(function () {
     btn.disabled = false;
@@ -852,6 +881,22 @@ document.getElementById("gate-form").addEventListener("submit", function (ev) {
     document.getElementById("gate-pass").select();
   });
 });
+(function autoUnlock() {
+  var form = document.getElementById("gate-form");
+  if (!form) return;
+  var saved = rememberedGate();
+  if (!saved) return;
+  var err = document.getElementById("gate-err");
+  var btn = form.querySelector("button");
+  if (err) err.hidden = true;
+  if (btn) { btn.disabled = true; btn.textContent = "正在进入…"; }
+  unlockWith(saved).then(function () {
+    rememberGate(saved);
+  }).catch(function () {
+    forgetGate();
+    if (btn) { btn.disabled = false; btn.textContent = "进入"; }
+  });
+})();
 </script>
 
 
