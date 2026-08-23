@@ -5,37 +5,68 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>labwork 全店选品名单</title>
 <style>
-:root{--ink:#1a1714;--muted:#6b6258;--line:#e4d9c8;--paper:#f7f1e6;--card:#fffdf8;--ok:#0f766e;--warn:#b45309;--bad:#9f1239;--chip:#efe6d6}
+:root{
+  --ink:#1a1714; --muted:#6b6258; --line:#e4d9c8; --paper:#f7f1e6;
+  --card:#fffdf8; --ok:#0f766e; --warn:#b45309; --bad:#9f1239;
+  --sel:#115e59; --chip:#efe6d6;
+}
 *{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.45 "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:14px/1.45 "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
 .wrap{max-width:1480px;margin:0 auto;padding:22px 18px 80px}
+.top{display:flex;justify-content:space-between;gap:16px;align-items:flex-end;flex-wrap:wrap}
 h1{margin:0;font-size:24px}
 .sub{color:var(--muted);font-size:13px;margin-top:6px}
 .kpis{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
-.kpis span{background:var(--card);border:1px solid var(--line);padding:8px 12px;min-width:84px}
 .kpis b{display:block;font-size:18px}
+.kpis span{background:var(--card);border:1px solid var(--line);padding:8px 12px;min-width:84px}
 .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px}
 .bar input,.bar select{padding:7px 8px;border:1px solid var(--line);background:var(--card)}
 .bar input[type=search]{flex:1;min-width:220px}
-.bar button{border:1px solid var(--line);background:var(--card);padding:7px 12px;cursor:pointer}
+.bar input.range{width:88px}
+.bar .range-wrap{display:flex;align-items:center;gap:4px}
+.bar button,.tabs button,td button{
+  border:1px solid var(--line);background:var(--card);padding:7px 12px;cursor:pointer}
+.bar button.pri{background:#1a1714;color:#fffdf8;border-color:#1a1714}
 .bar button:disabled{opacity:.4;cursor:default}
+.tabs{display:flex;gap:0;margin:8px 0 0}
+.tabs button{border-bottom:none;border-radius:6px 6px 0 0}
+.tabs button.on{background:#1a1714;color:#fffdf8}
 .hint{font-size:12px;color:var(--muted);margin:0 0 10px}
 table{width:100%;border-collapse:collapse;background:var(--card);font-size:12px}
 th,td{border:1px solid var(--line);padding:6px 7px;vertical-align:top;text-align:left}
 th{position:sticky;top:0;background:var(--chip);z-index:1}
+th.seq,td.seq{width:44px;text-align:right;color:var(--muted);white-space:nowrap}
+th.sort{cursor:pointer;user-select:none;white-space:nowrap}
+th.sort:hover{background:#e8dcc6}
 td.title{max-width:280px}
+input.edit{width:84px;padding:4px 6px;border:1px solid #c4b49a;background:#fff}
+input.note-in{width:200px;min-width:140px;padding:6px 8px;border:1px solid #c4b49a;background:#fff}
+td.note{min-width:160px;background:#fffbeb}
+.note-preview{margin-top:4px;color:#b45309;font-size:12px}
+td.acts{width:88px;white-space:nowrap}
+td.acts button{display:block;width:100%;margin:2px 0;padding:4px 8px}
+button.seen{color:#57534e}
+tr.picked{background:#ecfdf5}
+tr.excluded,tr.excluded.picked{background:#fecaca}
+tr.excluded td{color:#7f1d1d}
+tr.seen td{background:#e7e5e4 !important;color:#78716c !important}
+tr.seen a,tr.seen .v-优秀,tr.seen .v-可做,tr.seen .v-偏紧,tr.seen .v-不建议{color:#78716c !important}
+button.drop{color:#9f1239}
 .v-优秀{color:var(--ok);font-weight:700}
 .v-可做{color:#166534;font-weight:700}
 .v-偏紧{color:var(--warn);font-weight:700}
 .v-不建议{color:var(--bad);font-weight:700}
 .v-缺采购价{color:#78716c}
+.dirty{outline:2px solid #d97706}
 a{color:#1d4ed8;text-decoration:none}
-.foot{position:sticky;bottom:0;background:#1a1714;color:#fffdf8;padding:10px 16px}
+.foot{position:sticky;bottom:0;background:#1a1714;color:#fffdf8;padding:10px 16px;
+  display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .empty{padding:28px;color:var(--muted)}
 .pager{display:flex;align-items:center;gap:6px}
 .wrap,.foot{display:none}
 body.unlocked .wrap{display:block}
-body.unlocked .foot{display:block}
+body.unlocked .foot{display:flex}
 #gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
 #gate form{background:var(--card);border:1px solid var(--line);padding:28px 24px;width:100%;max-width:360px}
 #gate h1{font-size:20px;margin:0 0 8px}
@@ -55,19 +86,44 @@ body.unlocked .foot{display:block}
     <p id="gate-err" hidden>密码不正确</p>
   </form>
 </div>
-<script type="application/json" id="wb-enc">{"v":1,"kdf":"pbkdf2-sha256","iter":120000,"salt":"yAcAMi859CrG4tjZsMCJ6A==","iv":"He96R3cXb/ipEDqX","tag":"HfGID8yKTjuk9zUk/zm1BQ==","data":"W3ZFmTUFdTA="}</script>
+<script type="application/json" id="wb-enc">{"v":1,"kdf":"pbkdf2-sha256","iter":120000,"salt":"hgQxIG8zuc6mQ3fdwM1SnQ==","iv":"4KgIZNbpbLwkvWmy","tag":"pCO2fdghKg8gOY796yu3pg==","data":"vFMSg+Q+lsQ="}</script>
 <div class="wrap">
-  <h1 id="page-title">labwork 全店选品名单</h1>
-  <div class="sub" id="meta">正在加载数据目录…</div>
+  <div class="top">
+    <div>
+      <h1 id="page-title">labwork 全店选品名单</h1>
+      <div class="sub" id="meta">正在加载数据目录…</div>
+    </div>
+    <div class="bar">
+      <button type="button" id="btn-export">导出进度 JSON</button>
+      <button type="button" id="btn-import">导入进度</button>
+      <button type="button" class="pri" id="btn-html">下载含进度的 JSON</button>
+      <input type="file" id="file-import" accept="application/json" hidden/>
+    </div>
+  </div>
   <div class="kpis" id="kpis"></div>
+  <div class="tabs">
+    <button type="button" class="on" data-tab="all" id="tab-all">全部候选</button>
+    <button type="button" data-tab="sel" id="tab-sel">已选中 (0)</button>
+    <button type="button" data-tab="drop" id="tab-drop">已排除 (0)</button>
+  </div>
   <div class="bar">
-    <input type="search" id="q" placeholder="搜标题 / ID / OE / 上线时间"/>
-    <select id="f-verdict"><option value="">全部判定</option></select>
-    <select id="f-sort">
-      <option value="profit">毛利从高到低</option>
-      <option value="margin">毛利率从高到低</option>
-      <option value="listed">上线时间从新到旧</option>
-    </select>
+    <input type="search" id="q" placeholder="搜标题 / ID / OE / 店铺 / 备注 / 上线时间"/>
+    <label>判定 <select id="f-verdict"><option value="">全部</option></select></label>
+    <label>店铺 <select id="f-store"><option value="">全部店铺</option></select></label>
+    <label>毛利率
+      <select id="f-sort">
+        <option value="profit">默认 · 毛利$高到低</option>
+        <option value="margin">毛利率从高到低</option>
+        <option value="listed">上线时间从新到旧</option>
+      </select>
+    </label>
+    <span class="range-wrap">1688价 ¥
+      <input id="f-cogs-min" class="range" type="number" min="0" step="1" placeholder="最低">
+      <span>—</span>
+      <input id="f-cogs-max" class="range" type="number" min="0" step="1" placeholder="最高">
+    </span>
+    <button type="button" id="reset">重置筛选</button>
+    <span id="count">显示 0 / 0</span>
     <span class="pager">
       <button type="button" id="pg-prev">上一页</button>
       <span id="pg-info">1 / 1</span>
@@ -79,33 +135,72 @@ body.unlocked .foot{display:block}
       </select>
     </span>
   </div>
-  <p class="hint">数据按页加载（默认 80 条），打开不会一次渲染全表。默认按毛利$从高到低。汇率 6.8。头程默认 $2.86、尾程默认 $4.8。</p>
+  <p class="hint">改 eBay 价或 1688¥ 后点「确定」立刻重算：毛利$ = 售价 − 采购(¥÷6.8) − 头程 − 尾程 − 交易费 − 广告 − 退货。交易费按含税基数(售价×1.075)：成交费11.5% + 跨国1.5% + $0.40；广告10%；退货=尾程×2×6.5%。判定：≥40%优秀 / ≥25%可做 / ≥15%偏紧 / 其余不建议。缺采购价补上1688价后也会重算。选中进「已选中」，排除进「已排除」（红行）。进度按商品合并，同一条以最后一次为准。数据按页加载，打开不会一次渲染全表。</p>
   <div id="empty" class="empty" hidden>没有匹配的商品</div>
   <table>
     <thead>
       <tr>
-        <th>序号</th><th>判定</th><th>毛利$</th><th>毛利%</th><th>标题</th>
-        <th>ID / OE</th><th>链接上线时间</th><th>同款</th><th>同款Sold</th>
-        <th>eBay$</th><th>1688¥</th><th>头程</th><th>尾程</th>
-        <th>累计Sold</th><th>店铺</th><th>打开</th>
+        <th class="seq">序号</th>
+        <th>操作</th>
+        <th>备注</th>
+        <th>判定</th>
+        <th>毛利$</th>
+        <th id="th-margin" class="sort" title="点击切换毛利率排序">毛利%</th>
+        <th>标题</th>
+        <th>ID / OE</th>
+        <th>链接上线时间</th>
+        <th>同款</th>
+        <th>同款Sold</th>
+        <th>eBay$</th>
+        <th>1688¥</th>
+        <th></th>
+        <th>头程</th>
+        <th>尾程</th>
+        <th>店铺</th>
+        <th>链接</th>
+        <th>打开</th>
       </tr>
     </thead>
     <tbody id="tbody"></tbody>
   </table>
 </div>
-<div class="foot" id="foot">准备加载</div>
+<div class="foot">
+  <span id="foot-left">准备加载</span>
+  <span>改价后请点确定 · 选中会立刻保存</span>
+</div>
 <script>
 (function () {
   var DATA_BASE = new URL("data/", location.href).href;
   var PAGE = 80;
   var pageIdx = 0;
   var searchTimer = null;
+  var noteTimer = null;
   var manifest = null;
   var indexRows = [];
+  var origById = {};
+  var indexById = {};
   var filtered = [];
   var chunkCache = {};
   var itemCache = {};
   var sessionKey = null;
+  var LIST_ID = "labwork-full";
+  var KEY = "ebay-excellent-wb:labwork-full";
+  var CLOUD = { url: "", key: "" };
+  var tab = "all";
+  var selected = {};
+  var excluded = {};
+  var seen = {};
+  var notes = {};
+  var itemOps = {};
+  var lastFp = "";
+  var FX = 6.8;
+  var cloudTimer = null;
+  var pushing = false;
+  var lastRemoteAt = "";
+  var lastLocalAt = "";
+  var skipPoll = 0;
+  var syncLabel = "准备同步";
+  var bound = false;
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -117,6 +212,331 @@ body.unlocked .foot{display:block}
     if (isNaN(x)) return "";
     return (Math.round(x * 100) / 100) + u;
   }
+  function nowIso() { return new Date().toISOString(); }
+  function firstLeg(it) { return it.wh_first_leg_usd != null ? it.wh_first_leg_usd : 2.86; }
+  function lastMile(it) { return it.wh_last_mile_usd != null ? it.wh_last_mile_usd : 4.8; }
+
+  function calc(price, cogsCny, first, last) {
+    var cogs = Number(cogsCny) / FX;
+    var feeBase = Number(price) * 1.075;
+    var tx = feeBase * 0.115 + feeBase * 0.015 + 0.40;
+    var ad = feeBase * 0.10;
+    var ret = 0.065 * Number(last) * 2;
+    var profit = Number(price) - cogs - Number(first) - Number(last) - tx - ad - ret;
+    var m = Number(price) > 0 ? profit / Number(price) : 0;
+    var v = m >= 0.40 ? "优秀" : m >= 0.25 ? "可做" : m >= 0.15 ? "偏紧" : "不建议";
+    return { profit_wh_usd: Math.round(profit * 100) / 100, margin_wh_pct: Math.round(m * 1000) / 10, verdict: v };
+  }
+  function applyEcon(it, force) {
+    if (!(Number(it.price_usd) > 0) || !(Number(it.cogs_cny) > 0)) return;
+    if (!force && (it.verdict === "缺采购价" || it.verdict === "验真价格不通过")) return;
+    var e = calc(it.price_usd, it.cogs_cny, firstLeg(it), lastMile(it));
+    it.profit_wh_usd = e.profit_wh_usd;
+    it.margin_wh_pct = e.margin_wh_pct;
+    it.verdict = e.verdict;
+    patchIndex(it.item_id, it);
+  }
+  function patchIndex(id, it) {
+    var row = indexById[id];
+    if (!row) return;
+    if (it.verdict != null) row[1] = it.verdict;
+    if (it.margin_wh_pct != null) row[2] = it.margin_wh_pct;
+    if (it.profit_wh_usd != null) row[3] = it.profit_wh_usd;
+    if (it.cogs_cny != null) row[6] = it.cogs_cny;
+    if (it.price_usd != null) row[7] = it.price_usd;
+  }
+  function resetIndexRow(id) {
+    var row = indexById[id];
+    var o = origById[id];
+    if (!row || !o) return;
+    row[1] = o.v; row[2] = o.m; row[3] = o.p; row[6] = o.cogs; row[7] = o.price;
+  }
+  function findItem(id) { return itemCache[id] || null; }
+  function hydrateItem(it) {
+    if (!it || !it.item_id) return it;
+    if (it.price_usd0 == null) it.price_usd0 = it.price_usd;
+    if (it.cogs_cny0 == null) it.cogs_cny0 = it.cogs_cny;
+    var r = itemOps[it.item_id];
+    if (!r) return it;
+    it.note = r.note || "";
+    if (r.price_usd != null) it.price_usd = Number(r.price_usd);
+    if (r.cogs_cny != null) it.cogs_cny = Number(r.cogs_cny);
+    if (r.econ) applyEcon(it, true);
+    return it;
+  }
+
+  function recordOp(id, patch) {
+    var prev = itemOps[id] || {};
+    var it = findItem(id);
+    var next = {
+      at: nowIso(),
+      sel: !!selected[id],
+      drop: !!excluded[id],
+      seen: !!seen[id],
+      note: notes[id] || ""
+    };
+    if (it) {
+      next.price_usd = it.price_usd;
+      next.cogs_cny = it.cogs_cny;
+      next.verdict = it.verdict;
+      next.profit_wh_usd = it.profit_wh_usd;
+      next.margin_wh_pct = it.margin_wh_pct;
+    } else {
+      if (prev.price_usd != null) next.price_usd = prev.price_usd;
+      if (prev.cogs_cny != null) next.cogs_cny = prev.cogs_cny;
+      if (prev.verdict != null) next.verdict = prev.verdict;
+      if (prev.profit_wh_usd != null) next.profit_wh_usd = prev.profit_wh_usd;
+      if (prev.margin_wh_pct != null) next.margin_wh_pct = prev.margin_wh_pct;
+    }
+    if (prev.econ) next.econ = true;
+    if (patch) Object.keys(patch).forEach(function (k) { next[k] = patch[k]; });
+    itemOps[id] = next;
+  }
+  function fingerprint(st) {
+    var items = (st && st.items) || {};
+    return Object.keys(items).sort().map(function (id) {
+      return id + ":" + ((items[id] && items[id].at) || "");
+    }).join("|");
+  }
+  function normalizeState(st) {
+    var out = { v: 3, list_id: LIST_ID, items: {}, saved_at: "" };
+    if (!st || typeof st !== "object") return out;
+    out.list_id = st.list_id || LIST_ID;
+    if (st.v >= 3 && st.items && !Array.isArray(st.items)) {
+      Object.keys(st.items).forEach(function (id) {
+        out.items[id] = Object.assign({}, st.items[id]);
+      });
+      out.saved_at = st.saved_at || "";
+      return out;
+    }
+    var at = st.saved_at || nowIso();
+    function touch(id) {
+      if (!out.items[id]) out.items[id] = { at: at, sel: false, drop: false, seen: false, note: "" };
+      return out.items[id];
+    }
+    (st.selected || []).forEach(function (id) { touch(id).sel = true; });
+    (st.excluded || []).forEach(function (id) { touch(id).drop = true; });
+    (st.seen || []).forEach(function (id) { touch(id).seen = true; });
+    Object.keys(st.notes || {}).forEach(function (id) {
+      var t = String(st.notes[id] || "").trim();
+      if (t) touch(id).note = t;
+    });
+    Object.keys(st.edits || {}).forEach(function (id) {
+      var e = st.edits[id] || {};
+      var rec = touch(id);
+      if (e.price_usd != null) rec.price_usd = e.price_usd;
+      if (e.cogs_cny != null) rec.cogs_cny = e.cogs_cny;
+      rec.econ = true;
+    });
+    out.saved_at = at;
+    return out;
+  }
+  function mergeStates(a, b) {
+    var out = { v: 3, list_id: LIST_ID, items: {}, saved_at: "" };
+    var ids = {};
+    Object.keys((a && a.items) || {}).forEach(function (id) { ids[id] = 1; });
+    Object.keys((b && b.items) || {}).forEach(function (id) { ids[id] = 1; });
+    var latest = "";
+    Object.keys(ids).forEach(function (id) {
+      var x = ((a && a.items) || {})[id];
+      var y = ((b && b.items) || {})[id];
+      var pick = !x ? y : !y ? x : ((y.at || "") >= (x.at || "") ? y : x);
+      out.items[id] = Object.assign({}, pick);
+      if ((pick.at || "") > latest) latest = pick.at || "";
+    });
+    out.saved_at = latest || nowIso();
+    return out;
+  }
+  function arraysFromItems(items) {
+    var selectedIds = [];
+    var excludedIds = [];
+    var seenIds = [];
+    var noteMap = {};
+    var edits = {};
+    Object.keys(items || {}).forEach(function (id) {
+      var r = items[id] || {};
+      if (r.sel) selectedIds.push(id);
+      if (r.drop) excludedIds.push(id);
+      if (r.seen) seenIds.push(id);
+      if (r.note) noteMap[id] = r.note;
+      if (r.price_usd != null || r.cogs_cny != null) {
+        edits[id] = {};
+        if (r.price_usd != null) edits[id].price_usd = r.price_usd;
+        if (r.cogs_cny != null) edits[id].cogs_cny = r.cogs_cny;
+      }
+    });
+    return { selected: selectedIds, excluded: excludedIds, seen: seenIds, notes: noteMap, edits: edits };
+  }
+  function currentState() {
+    var extra = arraysFromItems(itemOps);
+    return {
+      v: 3,
+      list_id: LIST_ID,
+      items: itemOps,
+      selected: extra.selected,
+      excluded: extra.excluded,
+      seen: extra.seen,
+      notes: extra.notes,
+      edits: extra.edits,
+      saved_at: nowIso()
+    };
+  }
+  function applyOpToIndex(id, r) {
+    var row = indexById[id];
+    if (!row) return;
+    if (r.price_usd != null) row[7] = r.price_usd;
+    if (r.cogs_cny != null) row[6] = r.cogs_cny;
+    if (r.verdict != null) row[1] = r.verdict;
+    if (r.margin_wh_pct != null) row[2] = r.margin_wh_pct;
+    if (r.profit_wh_usd != null) row[3] = r.profit_wh_usd;
+    else if (r.econ && Number(row[7]) > 0 && Number(row[6]) > 0) {
+      var e = calc(row[7], row[6], 2.86, 4.8);
+      row[1] = e.verdict; row[2] = e.margin_wh_pct; row[3] = e.profit_wh_usd;
+    }
+  }
+  function applyState(st, persistLocal) {
+    if (!st) return;
+    if (st.list_id && st.list_id !== LIST_ID) return;
+    var norm = normalizeState(st);
+    itemOps = {};
+    Object.keys(norm.items || {}).forEach(function (id) {
+      itemOps[id] = Object.assign({}, norm.items[id]);
+    });
+    selected = {};
+    excluded = {};
+    seen = {};
+    notes = {};
+    Object.keys(origById).forEach(resetIndexRow);
+    Object.keys(itemCache).forEach(function (id) {
+      var it = itemCache[id];
+      it.price_usd = Number(it.price_usd0);
+      it.cogs_cny = Number(it.cogs_cny0);
+      it.note = "";
+    });
+    Object.keys(itemOps).forEach(function (id) {
+      var r = itemOps[id] || {};
+      if (r.sel) selected[id] = true;
+      if (r.drop) excluded[id] = true;
+      if (r.seen) seen[id] = true;
+      if (r.note) notes[id] = r.note;
+      applyOpToIndex(id, r);
+      var it = findItem(id);
+      if (!it) return;
+      it.note = r.note || "";
+      if (r.price_usd != null) it.price_usd = Number(r.price_usd);
+      if (r.cogs_cny != null) it.cogs_cny = Number(r.cogs_cny);
+      if (r.econ) applyEcon(it, true);
+    });
+    if (norm.saved_at) lastRemoteAt = norm.saved_at;
+    lastFp = fingerprint(norm);
+    if (persistLocal !== false) {
+      try { localStorage.setItem(KEY, JSON.stringify(norm)); } catch (err) {}
+    }
+  }
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (!raw) return;
+      applyState(JSON.parse(raw), false);
+    } catch (err) {}
+  }
+  function setSync(msg) {
+    syncLabel = msg;
+    var el = $("foot-left");
+    if (!el) return;
+    el.textContent = "已选中 " + Object.keys(selected).length + " 条 · 已排除 " + Object.keys(excluded).length + " 条 · 已阅 " + Object.keys(seen).length + " 条 · " + msg;
+  }
+  function cloudHeaders(withJson) {
+    var h = { "Accept": "application/json", "X-Mantle-Key": CLOUD.key };
+    if (withJson) h["Content-Type"] = "application/json";
+    return h;
+  }
+  function postState(st) {
+    return fetch(CLOUD.url, {
+      method: "POST",
+      headers: cloudHeaders(true),
+      body: JSON.stringify(st)
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      lastRemoteAt = st.saved_at;
+      lastFp = fingerprint(st);
+      setSync("已同步（每条以最后一次操作为准）");
+      return st;
+    });
+  }
+  function pushCloud(st) {
+    if (!CLOUD.url || !CLOUD.key) { setSync("已保存在本机"); return; }
+    pushing = true;
+    skipPoll = 2;
+    fetch(CLOUD.url, { method: "GET", cache: "no-store", headers: cloudHeaders(false) })
+      .then(function (r) { return r.ok ? r.json() : {}; })
+      .then(function (remote) {
+        var merged = mergeStates(normalizeState(remote), normalizeState(st || currentState()));
+        var extra = arraysFromItems(merged.items);
+        merged.selected = extra.selected;
+        merged.excluded = extra.excluded;
+        merged.seen = extra.seen;
+        merged.notes = extra.notes;
+        merged.edits = extra.edits;
+        return postState(merged);
+      })
+      .catch(function () { setSync("云端同步失败，已保存在本机"); })
+      .then(function () { pushing = false; });
+  }
+  function queueCloudSave(st) {
+    clearTimeout(cloudTimer);
+    setSync("正在同步…");
+    cloudTimer = setTimeout(function () { pushCloud(st || currentState()); }, 400);
+  }
+  function pullCloud(forceRender) {
+    if (!CLOUD.url || !CLOUD.key) return Promise.resolve();
+    if (pushing || skipPoll > 0) { skipPoll--; return Promise.resolve(); }
+    var ae = document.activeElement;
+    if (ae && (ae.classList.contains("note-in") || ae.classList.contains("edit"))) return Promise.resolve();
+    return fetch(CLOUD.url, {
+      method: "GET",
+      cache: "no-store",
+      headers: cloudHeaders(false)
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (remote) {
+      if (!remote || typeof remote !== "object") return;
+      var rem = normalizeState(remote);
+      if (!rem.saved_at && !Object.keys(rem.items).length) return;
+      var loc = normalizeState(currentState());
+      var merged = mergeStates(rem, loc);
+      var fp = fingerprint(merged);
+      if (fp === lastFp) return;
+      applyState(merged, true);
+      setSync("已合并同事进度（每条取最后一次）");
+      if (forceRender !== false) render();
+      if (fp !== fingerprint(rem)) queueCloudSave(merged);
+    }).catch(function () {});
+  }
+  function saveState() {
+    var st = currentState();
+    lastLocalAt = st.saved_at;
+    try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (err) {}
+    queueCloudSave(st);
+    return st;
+  }
+  function setNote(id, val) {
+    var t = String(val == null ? "" : val).trim();
+    if (t) notes[id] = t;
+    else delete notes[id];
+    var it = findItem(id);
+    if (it) it.note = t;
+    recordOp(id, { note: t });
+  }
+  function flushOpenNotes() {
+    document.querySelectorAll("#tbody input.note-in").forEach(function (inp) {
+      var tr = inp.closest("tr");
+      if (!tr) return;
+      setNote(tr.getAttribute("data-id"), inp.value);
+    });
+  }
+
   function isEncFile(obj) {
     return !!(obj && obj.iv && obj.tag && obj.data && obj.items == null && obj.rows == null && obj.chunks == null);
   }
@@ -144,16 +564,30 @@ body.unlocked .foot{display:block}
   function applyFilter() {
     var q = ($("q").value || "").trim().toLowerCase();
     var fv = $("f-verdict").value;
+    var fs = ($("f-store") || {}).value || "";
+    var minEl = $("f-cogs-min");
+    var maxEl = $("f-cogs-max");
+    var cmin = minEl ? Number(minEl.value) : NaN;
+    var cmax = maxEl ? Number(maxEl.value) : NaN;
+    var hasMin = !!(minEl && minEl.value !== "" && !isNaN(cmin));
+    var hasMax = !!(maxEl && maxEl.value !== "" && !isNaN(cmax));
     var sort = $("f-sort").value;
     filtered = indexRows.filter(function (r) {
+      var id = r[0];
+      if (tab === "sel" && !selected[id]) return false;
+      if (tab === "drop" && !excluded[id]) return false;
       if (fv && r[1] !== fv) return false;
+      if (fs && r[9] !== fs) return false;
+      var cogs = Number(r[6]);
+      if (hasMin && !(cogs >= cmin)) return false;
+      if (hasMax && !(cogs <= cmax)) return false;
       if (!q) return true;
-      return (r[0] + " " + r[1] + " " + r[4] + " " + r[5]).toLowerCase().indexOf(q) >= 0;
+      return (r[0] + " " + r[1] + " " + r[4] + " " + r[5] + " " + (r[9] || "") + " " + (notes[id] || "")).toLowerCase().indexOf(q) >= 0;
     });
     filtered.sort(function (a, b) {
       if (sort === "margin") return (Number(b[2]) || -1e9) - (Number(a[2]) || -1e9);
       if (sort === "listed") return String(b[5] || "").localeCompare(String(a[5] || ""));
-      return (Number(b[3]) || -1e9) - (Number(a[3]) || -1e9);
+      return (Number(b[3]) || -1e9) - (Number(a[3] || -1e9));
     });
     var pages = Math.max(1, Math.ceil(filtered.length / PAGE));
     if (pageIdx > pages - 1) pageIdx = pages - 1;
@@ -170,20 +604,54 @@ body.unlocked .foot{display:block}
       if (!name) return Promise.resolve();
       return fetchJson(name).then(function (data) {
         chunkCache[i] = data.items || [];
-        (data.items || []).forEach(function (it) { itemCache[it.item_id] = it; });
+        (data.items || []).forEach(function (it) {
+          itemCache[it.item_id] = hydrateItem(it);
+        });
       });
     }));
   }
+  function paintKpis() {
+    var nSel = Object.keys(selected).length;
+    var nDrop = Object.keys(excluded).length;
+    var nSeen = Object.keys(seen).length;
+    var excel = 0;
+    var priced = 0;
+    indexRows.forEach(function (r) {
+      if (r[1] === "优秀") excel += 1;
+      var o = origById[r[0]];
+      if (o && (Number(r[6]) !== Number(o.cogs) || Number(r[7]) !== Number(o.price))) priced += 1;
+    });
+    $("tab-sel").textContent = "已选中 (" + nSel + ")";
+    $("tab-drop").textContent = "已排除 (" + nDrop + ")";
+    $("count").textContent = "显示 " + filtered.length + " / " + indexRows.length;
+    var bits = "<span>候选<b>" + indexRows.length + "</b></span>" +
+      "<span>已选中<b>" + nSel + "</b></span>" +
+      "<span>已排除<b>" + nDrop + "</b></span>" +
+      "<span>已阅<b>" + nSeen + "</b></span>" +
+      "<span>当前仍优秀<b>" + excel + "</b></span>" +
+      "<span>已改价<b>" + priced + "</b></span>";
+    Object.keys((manifest && manifest.stores) || {}).sort().forEach(function (s) {
+      bits += "<span>" + esc(s) + "<b>" + manifest.stores[s] + "</b></span>";
+    });
+    $("kpis").innerHTML = bits;
+    setSync(syncLabel);
+  }
+  function updateSortHeader() {
+    var th = $("th-margin");
+    if (!th) return;
+    th.textContent = $("f-sort").value === "margin" ? "毛利% ↓" : "毛利%";
+  }
   function render() {
     applyFilter();
+    updateSortHeader();
     var start = pageIdx * PAGE;
     var rows = filtered.slice(start, start + PAGE);
     var missing = needChunks(rows);
     var go = function () { paint(rows, start); };
     if (missing.length) {
-      $("foot").textContent = "加载第 " + missing.join(",") + " 批数据…";
+      $("foot-left").textContent = "加载第 " + missing.join(",") + " 批数据…";
       loadChunks(missing).then(go).catch(function (err) {
-        $("foot").textContent = "数据加载失败: " + err.message;
+        $("foot-left").textContent = "数据加载失败: " + err.message;
       });
     } else go();
   }
@@ -194,69 +662,246 @@ body.unlocked .foot{display:block}
     $("pg-next").disabled = pageIdx >= pages - 1;
     $("empty").hidden = filtered.length > 0;
     $("tbody").innerHTML = rows.map(function (r, i) {
-      var it = itemCache[r[0]] || {};
+      var id = r[0];
+      var it = itemCache[id] || {};
+      var on = !!selected[id];
+      var drop = !!excluded[id];
+      var read = !!seen[id];
+      var rowCls = (drop ? "excluded " : "") + (on && !drop ? "picked " : "") + (read ? "seen" : "");
       var verdict = it.verdict || r[1] || "";
-      var ebay = it.ebay_url || ("https://www.ebay.com/itm/" + r[0]);
+      var ebay = it.ebay_url || ("https://www.ebay.com/itm/" + id);
       var ali = it.cogs_offer_url || "";
-      return "<tr>" +
-        "<td>" + (start + i + 1) + "</td>" +
+      var note = notes[id] || it.note || "";
+      return "<tr class=\"" + rowCls.trim() + "\" data-id=\"" + esc(id) + "\">" +
+        "<td class=\"seq\">" + (start + i + 1) + "</td>" +
+        "<td class=\"acts\">" +
+          "<button type=\"button\" class=\"sel\">" + (on ? "取消选中" : "选中") + "</button>" +
+          "<button type=\"button\" class=\"drop\">" + (drop ? "取消排除" : "排除") + "</button>" +
+          "<button type=\"button\" class=\"seen\">" + (read ? "取消已阅" : "已阅") + "</button>" +
+        "</td>" +
+        "<td class=\"note\"><input class=\"note-in\" type=\"text\" maxlength=\"200\" placeholder=\"备注\" value=\"" + esc(note) + "\"/></td>" +
         "<td class=\"v-" + esc(verdict) + "\">" + esc(verdict) + "</td>" +
         "<td>" + money(it.profit_wh_usd != null ? it.profit_wh_usd : r[3], "$") + "</td>" +
         "<td>" + (it.margin_wh_pct != null ? it.margin_wh_pct + "%" : (r[2] != null ? r[2] + "%" : "")) + "</td>" +
-        "<td class=\"title\"><b>" + esc(it.title_zh || r[4] || it.title || "") + "</b><div>" + esc((it.title || "").slice(0, 90)) + "</div></td>" +
-        "<td><a href=\"" + esc(ebay) + "\" target=\"_blank\" rel=\"noopener\">" + esc(r[0]) + "</a><div>" + esc(it.oe_display || "") + "</div></td>" +
+        "<td class=\"title\"><b>" + esc(it.title_zh || r[4] || it.title || "") + "</b><div>" + esc((it.title || "").slice(0, 90)) + "</div>" +
+          (it.vehicle_label ? "<div>" + esc(it.vehicle_label) + "</div>" : "") +
+          (note ? "<div class=\"note-preview\">备注：" + esc(note) + "</div>" : "") + "</td>" +
+        "<td><a href=\"" + esc(ebay) + "\" target=\"_blank\" rel=\"noopener\">" + esc(id) + "</a><div>" + esc(it.oe_display || "") + "</div></td>" +
         "<td>" + esc(it.listed_since || r[5] || "") + "</td>" +
         "<td>" + esc(it.same_listing_count || "") + "</td>" +
         "<td>" + esc(it.same_listing_sold_sum || "") + "</td>" +
-        "<td>" + money(it.price_usd != null ? it.price_usd : r[7], "$") + "</td>" +
-        "<td>" + money(it.cogs_cny != null ? it.cogs_cny : r[6], "¥") + "</td>" +
-        "<td>" + money(it.wh_first_leg_usd != null ? it.wh_first_leg_usd : 2.86, "$") + "</td>" +
-        "<td>" + money(it.wh_last_mile_usd != null ? it.wh_last_mile_usd : 4.8, "$") + "</td>" +
-        "<td>" + esc(it.sold_count_total || "") + "</td>" +
-        "<td>" + esc(it.store_name || "") + "</td>" +
-        "<td><a href=\"" + esc(ebay) + "\" target=\"_blank\" rel=\"noopener\">eBay</a>" +
-          (ali ? " · <a href=\"" + esc(ali) + "\" target=\"_blank\" rel=\"noopener\">1688</a>" : "") +
-        "</td></tr>";
+        "<td><input class=\"edit ebay\" type=\"number\" step=\"0.01\" value=\"" + esc(it.price_usd != null ? it.price_usd : r[7]) + "\"/></td>" +
+        "<td><input class=\"edit cogs\" type=\"number\" step=\"0.01\" value=\"" + esc(it.cogs_cny != null ? it.cogs_cny : r[6]) + "\"/></td>" +
+        "<td><button type=\"button\" class=\"ok\">确定</button></td>" +
+        "<td>" + money(firstLeg(it), "$") + "</td>" +
+        "<td>" + money(lastMile(it), "$") + "</td>" +
+        "<td>" + esc(it.store_name || r[9] || "") + "</td>" +
+        "<td><a class=\"lnk-ebay\" href=\"" + esc(ebay) + "\" target=\"_blank\" rel=\"noopener\">eBay</a>" +
+          (ali ? " · <a class=\"lnk-1688\" href=\"" + esc(ali) + "\" target=\"_blank\" rel=\"noopener\">1688</a>" : "") +
+        "</td>" +
+        "<td><button type=\"button\" class=\"open-both\"" +
+          (ali ? "" : " title=\"没有 1688 链接，只打开 eBay\"") +
+          ">打开</button></td></tr>";
     }).join("");
-    $("foot").textContent = "显示 " + filtered.length + " / " + indexRows.length + " · 本页 " + rows.length + " 条 · 已缓存 " + Object.keys(chunkCache).length + " 批";
+    paintKpis();
   }
   function rerenderTop() { pageIdx = 0; render(); }
 
+  function downloadState(name) {
+    flushOpenNotes();
+    var st = saveState();
+    st.items_selected = Object.keys(selected).map(function (id) {
+      var it = itemCache[id] || { item_id: id };
+      var row = Object.assign({}, it);
+      row.note = notes[id] || "";
+      return row;
+    });
+    var blob = new Blob([JSON.stringify(st, null, 2)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name || (LIST_ID + "-进度.json");
+    a.click();
+  }
+  function bindOnce() {
+    if (bound) return;
+    bound = true;
+    $("tbody").addEventListener("click", function (ev) {
+      var tr = ev.target.closest("tr");
+      if (!tr) return;
+      var id = tr.getAttribute("data-id");
+      var it = findItem(id);
+      if (ev.target.classList.contains("sel") || ev.target.classList.contains("drop") || ev.target.classList.contains("seen") || ev.target.classList.contains("ok")) {
+        flushOpenNotes();
+      }
+      if (ev.target.classList.contains("sel")) {
+        if (selected[id]) delete selected[id];
+        else { selected[id] = true; delete excluded[id]; }
+        recordOp(id);
+        saveState();
+        render();
+        return;
+      }
+      if (ev.target.classList.contains("drop")) {
+        if (excluded[id]) delete excluded[id];
+        else { excluded[id] = true; delete selected[id]; }
+        recordOp(id);
+        saveState();
+        render();
+        return;
+      }
+      if (ev.target.classList.contains("seen")) {
+        if (seen[id]) delete seen[id];
+        else seen[id] = true;
+        recordOp(id);
+        saveState();
+        render();
+        return;
+      }
+      if (ev.target.classList.contains("open-both")) {
+        var ebay = (it && it.ebay_url) || ("https://www.ebay.com/itm/" + id);
+        var ali = (it && it.cogs_offer_url) || "";
+        if (ali) window.open(ali, "_blank", "noopener");
+        window.open(ebay, "_blank", "noopener");
+        return;
+      }
+      if (ev.target.closest("a.lnk-ebay") || ev.target.closest("a.lnk-1688")) return;
+      if (ev.target.classList.contains("ok")) {
+        if (!it) return;
+        var p = Number(tr.querySelector(".ebay").value);
+        var c = Number(tr.querySelector(".cogs").value);
+        if (!(p > 0) || !(c > 0)) { alert("请填写有效的 eBay 价和 1688 价"); return; }
+        it.price_usd = p;
+        it.cogs_cny = c;
+        applyEcon(it, true);
+        recordOp(id, { econ: true });
+        saveState();
+        render();
+        setSync("已重算毛利 " + money(it.profit_wh_usd, "$") + " / " + it.margin_wh_pct + "% · " + it.verdict);
+      }
+    });
+    $("tbody").addEventListener("input", function (ev) {
+      if (ev.target.classList.contains("edit")) ev.target.classList.add("dirty");
+      if (ev.target.classList.contains("note-in")) {
+        var tr = ev.target.closest("tr");
+        if (!tr) return;
+        var id = tr.getAttribute("data-id");
+        var val = ev.target.value;
+        setNote(id, val);
+        clearTimeout(noteTimer);
+        noteTimer = setTimeout(function () { saveState(); }, 300);
+        var preview = tr.querySelector(".note-preview");
+        var t = String(notes[id] || "").trim();
+        if (t) {
+          if (!preview) {
+            preview = document.createElement("div");
+            preview.className = "note-preview";
+            var titleCell = tr.querySelector("td.title");
+            if (titleCell) titleCell.appendChild(preview);
+          }
+          preview.textContent = "备注：" + t;
+        } else if (preview) preview.remove();
+      }
+    });
+    document.querySelectorAll(".tabs button").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        flushOpenNotes();
+        saveState();
+        tab = btn.getAttribute("data-tab");
+        document.querySelectorAll(".tabs button").forEach(function (b) { b.classList.toggle("on", b === btn); });
+        rerenderTop();
+      });
+    });
+    $("q").addEventListener("input", function () {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(rerenderTop, 180);
+    });
+    $("f-verdict").addEventListener("change", rerenderTop);
+    $("f-store").addEventListener("change", rerenderTop);
+    $("f-sort").addEventListener("change", rerenderTop);
+    ["f-cogs-min", "f-cogs-max"].forEach(function (id) {
+      var el = $(id);
+      if (el) el.addEventListener("input", function () {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(rerenderTop, 180);
+      });
+    });
+    $("th-margin").addEventListener("click", function () {
+      var sel = $("f-sort");
+      sel.value = sel.value === "margin" ? "profit" : "margin";
+      rerenderTop();
+    });
+    $("reset").addEventListener("click", function () {
+      $("q").value = "";
+      $("f-verdict").value = "";
+      $("f-store").value = "";
+      $("f-sort").value = "profit";
+      $("f-cogs-min").value = "";
+      $("f-cogs-max").value = "";
+      rerenderTop();
+    });
+    $("pg-prev").addEventListener("click", function () { if (pageIdx > 0) { pageIdx--; render(); } });
+    $("pg-next").addEventListener("click", function () { pageIdx++; render(); });
+    $("pg-size").addEventListener("change", function () {
+      PAGE = Number($("pg-size").value) || 80;
+      rerenderTop();
+    });
+    $("btn-export").addEventListener("click", function () { downloadState(LIST_ID + "-进度.json"); });
+    $("btn-html").addEventListener("click", function () { downloadState("优秀选品工作名单-含进度.json"); });
+    $("btn-import").addEventListener("click", function () { $("file-import").click(); });
+    $("file-import").addEventListener("change", function (ev) {
+      var f = ev.target.files && ev.target.files[0];
+      if (!f) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        try {
+          var st = JSON.parse(reader.result);
+          applyState(st, true);
+          saveState();
+          render();
+        } catch (e) { alert("进度文件无法读取"); }
+      };
+      reader.readAsText(f, "utf-8");
+      ev.target.value = "";
+    });
+  }
+
   function startBoard() {
+    bindOnce();
     Promise.all([fetchJson("manifest.json"), fetchJson("index.json")]).then(function (pair) {
       manifest = pair[0];
-      indexRows = (pair[1].rows || []);
+      indexRows = pair[1].rows || [];
+      LIST_ID = manifest.list_id || LIST_ID;
+      KEY = "ebay-excellent-wb:" + LIST_ID;
+      FX = manifest.fx || 6.8;
+      CLOUD = manifest.cloud || CLOUD;
       $("page-title").textContent = manifest.title || "选品名单";
       document.title = manifest.title || document.title;
-      $("meta").textContent = "共 " + manifest.count + " 条 · 每批 " + manifest.chunk_size + " · 汇率 " + (manifest.fx || 6.8) + " · 默认按毛利从高到低";
+      $("meta").textContent = "共 " + manifest.count + " 条 · 每批 " + manifest.chunk_size + " · 汇率 " + FX + " · 默认按毛利从高到低 · 可离线发给同事";
       var vsel = $("f-verdict");
       Object.keys(manifest.verdicts || {}).sort().forEach(function (v) {
         var o = document.createElement("option");
         o.value = v; o.textContent = v + " (" + manifest.verdicts[v] + ")";
         vsel.appendChild(o);
       });
-      var bits = "<span>候选<b>" + manifest.count + "</b></span>";
-      Object.keys(manifest.verdicts || {}).forEach(function (v) {
-        bits += "<span>" + v + "<b>" + manifest.verdicts[v] + "</b></span>";
+      var ssel = $("f-store");
+      Object.keys(manifest.stores || {}).sort().forEach(function (s) {
+        var o = document.createElement("option");
+        o.value = s; o.textContent = s + " (" + manifest.stores[s] + ")";
+        ssel.appendChild(o);
       });
-      $("kpis").innerHTML = bits;
+      indexById = {};
+      origById = {};
+      indexRows.forEach(function (r) {
+        indexById[r[0]] = r;
+        origById[r[0]] = { v: r[1], m: r[2], p: r[3], cogs: r[6], price: r[7] };
+      });
+      loadState();
       render();
+      pullCloud(true);
+      setInterval(function () { pullCloud(true); }, 4000);
     }).catch(function (err) {
       $("meta").textContent = "打不开 data/ 目录。请用 GitHub Pages 或本地静态服务打开，不要直接双击 HTML。";
-      $("foot").textContent = String(err.message || err);
-    });
-
-    $("q").addEventListener("input", function () {
-      clearTimeout(searchTimer);
-      searchTimer = setTimeout(rerenderTop, 180);
-    });
-    $("f-verdict").addEventListener("change", rerenderTop);
-    $("f-sort").addEventListener("change", rerenderTop);
-    $("pg-prev").addEventListener("click", function () { if (pageIdx > 0) { pageIdx--; render(); } });
-    $("pg-next").addEventListener("click", function () { pageIdx++; render(); });
-    $("pg-size").addEventListener("change", function () {
-      PAGE = Number($("pg-size").value) || 80;
-      rerenderTop();
+      $("foot-left").textContent = String(err.message || err);
     });
   }
 
