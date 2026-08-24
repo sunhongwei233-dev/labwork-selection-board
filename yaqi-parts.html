@@ -168,6 +168,8 @@ function startBoard() {
     if (it.wh_first_leg_usd0 == null || it.wh_first_leg_usd0 === "") it.wh_first_leg_usd0 = Number(it.wh_first_leg_usd);
     if (it.wh_last_mile_usd == null || it.wh_last_mile_usd === "") it.wh_last_mile_usd = 4.8;
   });
+  var PAGE_SIZE = 80;
+  var pageIdx = 0;
   var LIST_ID = DATA.list_id || "excellent";
   var KEY = "ebay-excellent-wb:" + LIST_ID;
   var CLOUD = {
