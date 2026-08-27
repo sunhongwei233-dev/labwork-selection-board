@@ -49,6 +49,8 @@ tr.excluded td{color:#7f1d1d}
 tr.seen td{background:#e7e5e4 !important;color:#78716c !important}
 tr.seen a,tr.seen .v-优秀,tr.seen .v-可做,tr.seen .v-偏紧,tr.seen .v-不建议{color:#78716c !important}
 button.drop{color:#9f1239}
+button.buy{color:#0f766e;font-weight:600}
+tr.procured:not(.excluded){box-shadow:inset 3px 0 0 #0f766e}
 .v-优秀{color:var(--ok);font-weight:700}
 .v-可做{color:#166534;font-weight:700}
 .v-偏紧{color:var(--warn);font-weight:700}
@@ -97,6 +99,7 @@ body.unlocked .foot{display:flex}
   <div class="tabs">
     <button type="button" class="on" data-tab="all" id="tab-all">全部候选</button>
     <button type="button" data-tab="sel" id="tab-sel">已选中 (34)</button>
+    <button type="button" data-tab="buy" id="tab-buy">采购 (0)</button>
   </div>
   <div class="bar">
     <input id="q" type="search" placeholder="搜标题 / ID / OE / 店铺 / 车型">
@@ -118,7 +121,7 @@ body.unlocked .foot{display:flex}
     <button type="button" id="reset">重置筛选</button>
     <span id="count">显示 586 / 586</span>
   </div>
-  <p class="hint">改 eBay$、1688¥、头程$ 或尾程$ 后点「确定」重算美仓毛利（含税成交费 11.5%+跨国 1.5%+$0.40、广告 10%、退货 6.5%、汇率 6.8）。选中的品进「已选中」。进度按商品合并：三人同时改不会整表互挤，同一条以最后一次操作为准，大约 4 秒内看到。</p>
+  <p class="hint">改 eBay$、1688¥、头程$ 或尾程$ 后点「确定」重算美仓毛利（含税成交费 11.5%+跨国 1.5%+$0.40、广告 10%、退货 6.5%、汇率 6.8）。选中的品进「已选中」；在已选中里点「采购」进采购清单（仍留在已选中），采购 Tab 可取消采购。进度按商品合并：三人同时改不会整表互挤，同一条以最后一次操作为准，大约 4 秒内看到。</p>
   <table>
     <thead>
       <tr>
@@ -167,6 +170,7 @@ function startBoard() {
   var selected = {};
   var excluded = {};
   var seen = {};
+  var procured = {};
   var notes = {};
   var itemOps = {};
   var lastFp = "";
@@ -219,6 +223,7 @@ function startBoard() {
       sel: !!selected[id],
       drop: !!excluded[id],
       seen: !!seen[id],
+      buy: !!procured[id],
       note: notes[id] || ""
     };
     if (it) {
@@ -261,6 +266,7 @@ function startBoard() {
     (st.selected || []).forEach(function (id) { touch(id).sel = true; });
     (st.excluded || []).forEach(function (id) { touch(id).drop = true; });
     (st.seen || []).forEach(function (id) { touch(id).seen = true; });
+    (st.procured || st.bought || []).forEach(function (id) { touch(id).buy = true; });
     Object.keys(st.notes || {}).forEach(function (id) {
       var t = String(st.notes[id] || "").trim();
       if (t) touch(id).note = t;
@@ -297,6 +303,7 @@ function startBoard() {
     var selectedIds = [];
     var excludedIds = [];
     var seenIds = [];
+    var procuredIds = [];
     var noteMap = {};
     var edits = {};
     Object.keys(items || {}).forEach(function (id) {
@@ -304,6 +311,7 @@ function startBoard() {
       if (r.sel) selectedIds.push(id);
       if (r.drop) excludedIds.push(id);
       if (r.seen) seenIds.push(id);
+      if (r.buy) procuredIds.push(id);
       if (r.note) noteMap[id] = r.note;
       if (r.price_usd != null || r.cogs_cny != null || r.wh_first_leg_usd != null || r.wh_last_mile_usd != null) {
         edits[id] = {};
@@ -313,7 +321,7 @@ function startBoard() {
         if (r.wh_last_mile_usd != null) edits[id].wh_last_mile_usd = r.wh_last_mile_usd;
       }
     });
-    return { selected: selectedIds, excluded: excludedIds, seen: seenIds, notes: noteMap, edits: edits };
+    return { selected: selectedIds, excluded: excludedIds, seen: seenIds, procured: procuredIds, notes: noteMap, edits: edits };
   }
   function currentState() {
     var extra = arraysFromItems(itemOps);
@@ -324,6 +332,7 @@ function startBoard() {
       selected: extra.selected,
       excluded: extra.excluded,
       seen: extra.seen,
+      procured: extra.procured,
       notes: extra.notes,
       edits: extra.edits,
       saved_at: nowIso()
@@ -340,6 +349,7 @@ function startBoard() {
     selected = {};
     excluded = {};
     seen = {};
+    procured = {};
     notes = {};
     ITEMS.forEach(function (it) {
       it.price_usd = Number(it.price_usd0);
@@ -353,6 +363,7 @@ function startBoard() {
       if (r.sel) selected[id] = true;
       if (r.drop) excluded[id] = true;
       if (r.seen) seen[id] = true;
+      if (r.buy) procured[id] = true;
       if (r.note) notes[id] = r.note;
       var it = findItem(id);
       if (!it) return;
@@ -385,7 +396,7 @@ function startBoard() {
     syncLabel = msg;
     var el = document.getElementById("foot-left");
     if (!el) return;
-    el.textContent = "已选中 " + Object.keys(selected).length + " 条 · 已排除 " + Object.keys(excluded).length + " 条 · 已阅 " + Object.keys(seen).length + " 条 · " + msg;
+    el.textContent = "已选中 " + Object.keys(selected).length + " 条 · 采购 " + Object.keys(procured).length + " 条 · 已排除 " + Object.keys(excluded).length + " 条 · 已阅 " + Object.keys(seen).length + " 条 · " + msg;
   }
   function cloudHeaders(withJson) {
     var h = { "Accept": "application/json", "X-Mantle-Key": CLOUD.key };
@@ -497,6 +508,7 @@ function startBoard() {
     var hasMax = !!(maxEl && maxEl.value !== "" && !isNaN(cmax));
     var rows = ITEMS.filter(function (it) {
       if (tab === "sel" && !selected[it.item_id]) return false;
+      if (tab === "buy" && !procured[it.item_id]) return false;
       if (fv && it.verdict !== fv) return false;
       if (fs && it.store_name !== fs) return false;
       var cogs = Number(it.cogs_cny);
@@ -533,13 +545,21 @@ function startBoard() {
       var on = !!selected[it.item_id];
       var drop = !!excluded[it.item_id];
       var read = !!seen[it.item_id];
-      var rowCls = (drop ? "excluded " : "") + (on && !drop ? "picked " : "") + (read ? "seen" : "");
+      var buy = !!procured[it.item_id];
+      var rowCls = (drop ? "excluded " : "") + (on && !drop ? "picked " : "") + (buy ? "procured " : "") + (read ? "seen" : "");
+      var buyBtn = "";
+      if (tab === "buy" || buy) {
+        buyBtn = "<button type=\"button\" class=\"buy\">取消采购</button>";
+      } else if (tab === "sel" && on) {
+        buyBtn = "<button type=\"button\" class=\"buy\">采购</button>";
+      }
       return "<tr class=\"" + rowCls.trim() + "\" data-id=\"" + esc(it.item_id) + "\">" +
         "<td class=\"seq\">" + (i + 1) + "</td>" +
         "<td class=\"acts\">" +
           "<button type=\"button\" class=\"sel\">" + (on ? "取消选中" : "选中") + "</button>" +
           "<button type=\"button\" class=\"drop\">" + (drop ? "取消排除" : "排除") + "</button>" +
           "<button type=\"button\" class=\"seen\">" + (read ? "取消已阅" : "已阅") + "</button>" +
+          buyBtn +
         "</td>" +
         "<td class=\"note\"><input class=\"note-in\" type=\"text\" maxlength=\"200\" placeholder=\"备注\" value=\"" + esc(notes[it.item_id] || it.note || "") + "\"/></td>" +
         "<td class=\"v-" + esc(it.verdict) + "\">" + esc(it.verdict) + "</td>" +
@@ -567,7 +587,10 @@ function startBoard() {
     var nSel = Object.keys(selected).length;
     var nDrop = Object.keys(excluded).length;
     var nSeen = Object.keys(seen).length;
+    var nBuy = Object.keys(procured).length;
     document.getElementById("tab-sel").textContent = "已选中 (" + nSel + ")";
+    var tabBuy = document.getElementById("tab-buy");
+    if (tabBuy) tabBuy.textContent = "采购 (" + nBuy + ")";
     document.getElementById("count").textContent = "显示 " + rows.length + " / " + ITEMS.length;
     var excel = ITEMS.filter(function (it) { return it.verdict === "优秀"; }).length;
     var storeBits = "";
@@ -582,12 +605,13 @@ function startBoard() {
     document.getElementById("kpis").innerHTML =
       "<span>候选<b>" + ITEMS.length + "</b></span>" +
       "<span>已选中<b>" + nSel + "</b></span>" +
+      "<span>采购<b>" + nBuy + "</b></span>" +
       "<span>已排除<b>" + nDrop + "</b></span>" +
       "<span>已阅<b>" + nSeen + "</b></span>" +
       "<span>当前仍优秀<b>" + excel + "</b></span>" +
       "<span>已改价<b>" + ITEMS.filter(function (it) { return Number(it.price_usd) !== Number(it.price_usd0) || Number(it.cogs_cny) !== Number(it.cogs_cny0); }).length + "</b></span>" +
       storeBits;
-    document.getElementById("foot-left").textContent = "已选中 " + nSel + " 条 · 已排除 " + nDrop + " 条 · 已阅 " + nSeen + " 条 · " + syncLabel;
+    document.getElementById("foot-left").textContent = "已选中 " + nSel + " 条 · 采购 " + nBuy + " 条 · 已排除 " + nDrop + " 条 · 已阅 " + nSeen + " 条 · " + syncLabel;
   }
   function byId(id) {
     for (var i = 0; i < ITEMS.length; i++) if (ITEMS[i].item_id === id) return ITEMS[i];
@@ -602,7 +626,7 @@ function startBoard() {
     if (!tr) return;
     var it = byId(tr.getAttribute("data-id"));
     if (!it) return;
-    if (ev.target.classList.contains("sel") || ev.target.classList.contains("drop") || ev.target.classList.contains("seen") || ev.target.classList.contains("ok")) {
+    if (ev.target.classList.contains("sel") || ev.target.classList.contains("drop") || ev.target.classList.contains("seen") || ev.target.classList.contains("buy") || ev.target.classList.contains("ok")) {
       flushOpenNotes();
     }
     if (ev.target.classList.contains("sel")) {
@@ -624,6 +648,21 @@ function startBoard() {
     if (ev.target.classList.contains("seen")) {
       if (seen[it.item_id]) delete seen[it.item_id];
       else seen[it.item_id] = true;
+      recordOp(it.item_id);
+      saveState();
+      render();
+      return;
+    }
+    if (ev.target.classList.contains("buy")) {
+      if (procured[it.item_id]) {
+        delete procured[it.item_id];
+      } else {
+        if (!selected[it.item_id]) {
+          alert("请先选中该商品，再加入采购");
+          return;
+        }
+        procured[it.item_id] = true;
+      }
       recordOp(it.item_id);
       saveState();
       render();
@@ -729,6 +768,13 @@ function startBoard() {
     st.items_selected = ITEMS.filter(function (it) { return selected[it.item_id]; }).map(function (it) {
       var row = Object.assign({}, it);
       row.note = notes[it.item_id] || "";
+      row.procured = !!procured[it.item_id];
+      return row;
+    });
+    st.items_procured = ITEMS.filter(function (it) { return procured[it.item_id]; }).map(function (it) {
+      var row = Object.assign({}, it);
+      row.note = notes[it.item_id] || "";
+      row.selected = !!selected[it.item_id];
       return row;
     });
     var blob = new Blob([JSON.stringify(st, null, 2)], { type: "application/json" });
