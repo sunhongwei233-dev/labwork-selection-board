@@ -92,6 +92,7 @@ body.unlocked .foot{display:flex}
       <button type="button" id="btn-export">导出进度 JSON</button>
       <button type="button" id="btn-import">导入进度</button>
       <button type="button" class="pri" id="btn-html">下载含进度的 HTML</button>
+      <button type="button" id="btn-sel-to-buy" title="把当前已选中全部写入采购清单并同步给同事">已选中→采购</button>
       <input type="file" id="file-import" accept="application/json" hidden="">
     </div>
   </div>
@@ -132,7 +133,7 @@ body.unlocked .foot{display:flex}
     </thead>
     <tbody id="tbody"></tbody>
   </table>
-  <p class="empty" id="empty" hidden="">这一页没有符合条件的品。</p>
+  <p class="empty" id="empty" hidden="">这一页没有符合条件的品。采购清单需在「已选中」里点「采购」，或点顶部「已选中→采购」。</p>
 </div>
 <div class="foot">
   <span id="foot-left">已选中 34 条 · 已排除 10 条 · 本机已保存</span>
@@ -293,7 +294,13 @@ function startBoard() {
       var x = ((a && a.items) || {})[id];
       var y = ((b && b.items) || {})[id];
       var pick = !x ? y : !y ? x : ((y.at || "") >= (x.at || "") ? y : x);
-      out.items[id] = Object.assign({}, pick);
+      pick = Object.assign({}, pick);
+      // 旧客户端写入可能缺 buy 字段，避免把已采购状态冲掉
+      if (pick.buy === undefined) {
+        if (x && x.buy) pick.buy = true;
+        else if (y && y.buy) pick.buy = true;
+      }
+      out.items[id] = pick;
       if ((pick.at || "") > latest) latest = pick.at || "";
     });
     out.saved_at = latest || nowIso();
@@ -427,6 +434,7 @@ function startBoard() {
         merged.selected = extra.selected;
         merged.excluded = extra.excluded;
         merged.seen = extra.seen;
+        merged.procured = extra.procured;
         merged.notes = extra.notes;
         merged.edits = extra.edits;
         return postState(merged);
@@ -540,7 +548,15 @@ function startBoard() {
     var rows = filtered();
     updateSortHeader();
     var tb = document.getElementById("tbody");
-    document.getElementById("empty").hidden = rows.length > 0;
+    var emptyEl = document.getElementById("empty");
+    emptyEl.hidden = rows.length > 0;
+    if (rows.length === 0) {
+      emptyEl.textContent = tab === "buy"
+        ? ("采购清单为空（当前已选中 " + Object.keys(selected).length + " 条）。请到「已选中」点「采购」，或点顶部「已选中→采购」同步给同事。")
+        : tab === "sel"
+          ? "还没有选中的品。"
+          : "这一页没有符合条件的品。";
+    }
     tb.innerHTML = rows.map(function (it, i) {
       var on = !!selected[it.item_id];
       var drop = !!excluded[it.item_id];
@@ -762,6 +778,20 @@ function startBoard() {
     if (cmin) cmin.value = "";
     if (cmax) cmax.value = "";
     render();
+  });
+  var btnSelToBuy = document.getElementById("btn-sel-to-buy");
+  if (btnSelToBuy) btnSelToBuy.addEventListener("click", function () {
+    var ids = Object.keys(selected);
+    if (!ids.length) { alert("当前没有已选中的品"); return; }
+    var n = 0;
+    ids.forEach(function (id) {
+      if (!procured[id]) { procured[id] = true; n++; }
+      recordOp(id);
+    });
+    saveState();
+    render();
+    setSync(n ? ("已将 " + n + " 条已选中加入采购并同步") : ("已选中均已在采购清单（共 " + ids.length + " 条）"));
+    alert((n ? ("已加入采购 " + n + " 条") : "没有新增（均已在采购）") + "，约 4 秒内同事可见。");
   });
   document.getElementById("btn-export").addEventListener("click", function () {
     var st = saveState();
