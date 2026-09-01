@@ -210,6 +210,11 @@ function startBoard() {
   }
 
   function nowIso() { return new Date().toISOString(); }
+  function saneAt(at) {
+    if (!at) return "";
+    var now = nowIso();
+    return at > now ? now : at;
+  }
   function findItem(id) {
     if (typeof byId === "function") return byId(id);
     if (typeof ITEM_MAP !== "undefined" && ITEM_MAP[id]) return ITEM_MAP[id];
@@ -254,9 +259,11 @@ function startBoard() {
     out.list_id = st.list_id || LIST_ID;
     if (st.v >= 3 && st.items && !Array.isArray(st.items)) {
       Object.keys(st.items).forEach(function (id) {
-        out.items[id] = Object.assign({}, st.items[id]);
+        var rec = Object.assign({}, st.items[id]);
+        if (rec.at) rec.at = saneAt(rec.at);
+        out.items[id] = rec;
       });
-      out.saved_at = st.saved_at || "";
+      out.saved_at = saneAt(st.saved_at || "") || st.saved_at || "";
       return out;
     }
     var at = st.saved_at || nowIso();
@@ -293,8 +300,9 @@ function startBoard() {
     Object.keys(ids).forEach(function (id) {
       var x = ((a && a.items) || {})[id];
       var y = ((b && b.items) || {})[id];
-      var pick = !x ? y : !y ? x : ((y.at || "") >= (x.at || "") ? y : x);
+      var pick = !x ? y : !y ? x : (saneAt(y.at || "") >= saneAt(x.at || "") ? y : x);
       pick = Object.assign({}, pick);
+      if (pick.at) pick.at = saneAt(pick.at);
       // 旧客户端写入可能缺 buy 字段，避免把已采购状态冲掉
       if (pick.buy === undefined) {
         if (x && x.buy) pick.buy = true;
@@ -303,7 +311,7 @@ function startBoard() {
       out.items[id] = pick;
       if ((pick.at || "") > latest) latest = pick.at || "";
     });
-    out.saved_at = latest || nowIso();
+    out.saved_at = saneAt(latest) || latest || nowIso();
     return out;
   }
   function arraysFromItems(items) {
@@ -427,7 +435,10 @@ function startBoard() {
     pushing = true;
     skipPoll = 2;
     fetch(CLOUD.url, { method: "GET", cache: "no-store", headers: cloudHeaders(false) })
-      .then(function (r) { return r.ok ? r.json() : {}; })
+      .then(function (r) {
+        if (!r.ok) throw new Error("GET HTTP " + r.status);
+        return r.json();
+      })
       .then(function (remote) {
         var merged = mergeStates(normalizeState(remote), normalizeState(st || currentState()));
         var extra = arraysFromItems(merged.items);
@@ -437,9 +448,13 @@ function startBoard() {
         merged.procured = extra.procured;
         merged.notes = extra.notes;
         merged.edits = extra.edits;
+        merged.saved_at = saneAt(merged.saved_at) || nowIso();
         return postState(merged);
       })
-      .catch(function () { setSync("云端同步失败，已保存在本机"); })
+      .catch(function (err) {
+        var msg = (err && err.message) ? err.message : "网络错误";
+        setSync("云端同步失败（" + msg + "），已保存在本机");
+      })
       .then(function () { pushing = false; });
   }
   function queueCloudSave(st) {
@@ -470,7 +485,10 @@ function startBoard() {
       setSync("已合并同事进度（每条取最后一次）");
       if (forceRender !== false) render();
       if (fp !== fingerprint(rem)) queueCloudSave(merged);
-    }).catch(function () {});
+    }).catch(function (err) {
+      var msg = (err && err.message) ? err.message : "网络错误";
+      if (syncLabel.indexOf("失败") < 0) setSync("拉取云端失败（" + msg + "），暂用本机进度");
+    });
   }
   function saveState() {
     var st = currentState();
